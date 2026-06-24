@@ -300,6 +300,13 @@ function pruneOldRides(db){
 var currentRole=null, currentUser=null, loginTarget=null;
 
 function openLogin(role){
+  if(!_localCache){
+    // Firebase noch nicht bereit - kurz warten und nochmal versuchen
+    var btn=event&&event.currentTarget;
+    if(btn) btn.style.borderColor='var(--accent)';
+    setTimeout(function(){ openLogin(role); }, 500);
+    return;
+  }
   loginTarget=role;
   loadPasswords();
   document.getElementById('loginError').style.display='none';
@@ -1314,7 +1321,8 @@ function navi(url){ if(url) window.open(url,'_blank'); }
 // INIT
 async function init(){
   // Lade-Indikator
-  document.getElementById('startScreen').innerHTML='<div style="text-align:center;color:#b0b6cc"><div style="font-size:40px;margin-bottom:16px">...</div><div>Verbinde mit Firebase...</div></div>';
+  document.getElementById('startScreen').innerHTML='<div style="text-align:center;color:#b0b6cc;padding:40px"><div style="font-size:40px;margin-bottom:16px;animation:spin 1s linear infinite;display:inline-block">&#8635;</div><br><div style="margin-top:12px;font-size:15px">Verbinde mit Server...</div><div style="font-size:12px;margin-top:8px;color:#666">Bitte warten</div></div>';
+  document.head.insertAdjacentHTML('beforeend','<style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>');
   await initDB();
   // Startscreen wiederherstellen
   document.getElementById('startScreen').innerHTML=`

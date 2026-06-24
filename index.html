@@ -414,7 +414,7 @@ var STATUS_BADGE={new:'badge-new',pending:'badge-pending',accepted:'badge-accept
 var MONTHS=['Januar','Februar','Maerz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 
 function setupZentrale(){
-  renderTabs(['Heute','Kalender','Historie','Kunden','Brett','Fahrer'],0,function(i){
+  renderTabs(['Heute','Kalender','Historie','Kunden','Brett','Wo ist'],0,function(i){
     zActiveTab=i;
     if(i===0) renderZToday();
     else if(i===1) renderZKalender();
@@ -944,41 +944,96 @@ function delCustomer(id){
 function doDelCustomer(){ var db=getDB(); db.customers=db.customers.filter(function(x){return x.id!==window._delCustomerId;}); saveDB(db); closeGModal(); renderZKunden(); }
 
 // FAHRER STANDORTE
-function renderZFahrerStandorte(){
-  var db=getDB(); var now=Date.now();
-  var h='<div class="section-header"><div><div class="section-title">Fahrer Standorte</div><div class="section-sub">Letzter bekannter Standort</div></div>';
-  h+='<button class="btn btn-ghost" style="padding:6px 14px;font-size:13px" onclick="renderZFahrerStandorte()">Aktualisieren</button></div>';
-  var active=db.employees.filter(function(e){return e.active&&e.online;});
-  var inactive=db.employees.filter(function(e){return e.active&&!e.online;});
-  if(!active.length){ h+='<div class="empty-state"><p>Keine Fahrer eingeloggt.</p></div>'; }
-  else{
-    h+='<div style="display:grid;gap:12px">';
-    active.forEach(function(e){
-      var gps=e.gps||null; var minsAgo=gps?Math.floor((now-gps.ts)/60000):null;
-      var freshStr=minsAgo===null?'kein Signal':minsAgo<2?'gerade eben':minsAgo<60?'vor '+minsAgo+' Min':'vor '+Math.floor(minsAgo/60)+' Std';
-      var freshColor=minsAgo===null?'#9aa0b8':minsAgo<2?'#2ecc71':minsAgo<10?'#f39c12':'#e74c3c';
-      var gpsBadge=!gps?'<span style="font-size:11px;color:#9aa0b8">kein Signal</span>':!gps.active?'<span style="background:rgba(231,76,60,.15);color:#e74c3c;border-radius:4px;font-size:11px;font-weight:700;padding:2px 8px">GPS pausiert</span>':'<span style="background:rgba(46,204,113,.15);color:#2ecc71;border-radius:4px;font-size:11px;font-weight:700;padding:2px 8px">GPS aktiv</span>';
-      h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
-      h+='<div style="display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:50%;background:#2ecc71;box-shadow:0 0 6px #2ecc71;display:inline-block"></span><strong style="font-size:15px">'+e.name+'</strong></div>'+gpsBadge+'</div>';
-      if(gps){
-        h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
-        h+='<div><div style="font-size:11px;color:#9aa0b8;margin-bottom:2px">ZULETZT GESEHEN</div><div style="font-size:13px;font-weight:600;color:'+freshColor+'">'+freshStr+'</div></div>';
-        h+='<div><div style="font-size:11px;color:#9aa0b8;margin-bottom:2px">UHRZEIT</div><div style="font-size:13px;font-weight:500">'+fmtTs(gps.ts)+'</div></div></div>';
-        var mapsUrl='https://www.google.com/maps?q='+gps.lat+','+gps.lng;
-        h+='<a href="'+mapsUrl+'" target="_blank" style="text-decoration:none"><div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:#b0b6cc;display:flex;justify-content:space-between"><span>'+gps.lat.toFixed(4)+', '+gps.lng.toFixed(4)+'</span><span style="color:#5b9cf6">In Maps &rarr;</span></div></a>';
-      } else { h+='<div style="font-size:13px;color:#9aa0b8">GPS nicht freigegeben oder kein Signal.</div>'; }
-      h+='</div>';
-    });
-    h+='</div>';
+// Reverse Geocoding Cache
+var _geoCache = {};
+
+async function getOrtName(lat, lng) {
+  var key = lat.toFixed(3) + ',' + lng.toFixed(3);
+  if (_geoCache[key]) return _geoCache[key];
+  try {
+    var url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=10&accept-language=de';
+    var resp = await fetch(url, {headers:{'User-Agent':'TaxiHubApp/1.0'}});
+    var data = await resp.json();
+    var addr = data.address || {};
+    var ort = addr.city || addr.town || addr.village || addr.municipality || addr.county || 'Unbekannt';
+    var result = ort;
+    _geoCache[key] = result;
+    return result;
+  } catch(e) {
+    return lat.toFixed(4) + ', ' + lng.toFixed(4);
   }
-  if(inactive.length){
-    h+='<div style="font-size:12px;font-weight:600;color:#9aa0b8;text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;padding-top:16px;border-top:1px solid #323748">Offline ('+inactive.length+')</div>';
-    h+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
-    inactive.forEach(function(e){ h+='<span style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;color:#9aa0b8"><span style="width:6px;height:6px;border-radius:50%;background:#6b7290;display:inline-block;margin-right:6px"></span>'+e.name+'</span>'; });
-    h+='</div>';
-  }
-  document.getElementById('mainContent').innerHTML=h;
 }
+
+async function renderZFahrerStandorteAsync() {
+  var db = getDB();
+  var now = Date.now();
+  var active = db.employees.filter(function(e){ return e.active && e.online; });
+  var inactive = db.employees.filter(function(e){ return e.active && !e.online; });
+
+  // Load all place names first
+  var placeNames = {};
+  for (var i = 0; i < active.length; i++) {
+    var e = active[i];
+    if (e.gps && e.gps.lat) {
+      placeNames[e.id] = await getOrtName(e.gps.lat, e.gps.lng);
+    }
+  }
+
+  var h = '<div class="section-header"><div><div class="section-title">Wo ist wer?</div><div class="section-sub">Letzter bekannter Standort</div></div>';
+  h += '<button class="btn btn-ghost" style="padding:6px 14px;font-size:13px" onclick="renderZFahrerStandorte()">Aktualisieren</button></div>';
+
+  if (!active.length) {
+    h += '<div class="empty-state"><p>Keine Fahrer eingeloggt.</p></div>';
+  } else {
+    h += '<div style="display:grid;gap:12px">';
+    active.forEach(function(e) {
+      var gps = e.gps || null;
+      var minsAgo = gps ? Math.floor((now - gps.ts) / 60000) : null;
+      var freshStr = minsAgo === null ? 'kein Signal' : minsAgo < 2 ? 'gerade eben' : minsAgo < 60 ? 'vor ' + minsAgo + ' Min' : 'vor ' + Math.floor(minsAgo/60) + ' Std';
+      var freshColor = minsAgo === null ? '#9aa0b8' : minsAgo < 2 ? '#2ecc71' : minsAgo < 10 ? '#f39c12' : '#e74c3c';
+      var gpsBadge = !gps ? '<span style="font-size:11px;color:#9aa0b8">kein Signal</span>' :
+        !gps.active ? '<span style="background:rgba(231,76,60,.15);color:#e74c3c;border-radius:4px;font-size:11px;font-weight:700;padding:2px 8px">GPS pausiert</span>' :
+        '<span style="background:rgba(46,204,113,.15);color:#2ecc71;border-radius:4px;font-size:11px;font-weight:700;padding:2px 8px">GPS aktiv</span>';
+      var ortName = placeNames[e.id] || '';
+
+      h += '<div class="card">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
+      h += '<div style="display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:50%;background:#2ecc71;box-shadow:0 0 6px #2ecc71;display:inline-block"></span><strong style="font-size:15px">' + e.name + '</strong></div>' + gpsBadge + '</div>';
+
+      if (gps) {
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">';
+        h += '<div><div style="font-size:11px;color:#9aa0b8;margin-bottom:2px">ZULETZT GESEHEN</div><div style="font-size:13px;font-weight:600;color:' + freshColor + '">' + freshStr + '</div></div>';
+        h += '<div><div style="font-size:11px;color:#9aa0b8;margin-bottom:2px">UHRZEIT</div><div style="font-size:13px;font-weight:500">' + fmtTs(gps.ts) + '</div></div>';
+        h += '</div>';
+        if (ortName) {
+          h += '<div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:10px">' + ortName + '</div>';
+        }
+        var mapsUrl = 'https://www.google.com/maps?q=' + gps.lat + ',' + gps.lng;
+        h += '<a href="' + mapsUrl + '" target="_blank" style="text-decoration:none"><div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:#5b9cf6;display:flex;justify-content:space-between;align-items:center"><span>In Google Maps anzeigen</span><span>&rarr;</span></div></a>';
+      } else {
+        h += '<div style="font-size:13px;color:#9aa0b8">GPS nicht freigegeben oder kein Signal.</div>';
+      }
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
+  if (inactive.length) {
+    h += '<div style="font-size:12px;font-weight:600;color:#9aa0b8;text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;padding-top:16px;border-top:1px solid #323748">Offline (' + inactive.length + ')</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    inactive.forEach(function(e) {
+      h += '<span style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;color:#9aa0b8"><span style="width:6px;height:6px;border-radius:50%;background:#6b7290;display:inline-block;margin-right:6px"></span>' + e.name + '</span>';
+    });
+    h += '</div>';
+  }
+
+  document.getElementById('mainContent').innerHTML = h;
+}
+
+function renderZFahrerStandorte(){
+  // Show loading while geocoding
+  document.getElementById('mainContent').innerHTML='<div class="empty-state"><p>Lade Standorte...</p></div>';
+  renderZFahrerStandorteAsync();
 
 // SCHWARZES BRETT
 function renderZBrett(){

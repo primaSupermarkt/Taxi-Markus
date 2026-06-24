@@ -122,13 +122,16 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <h2 id="loginTitle">Anmeldung</h2>
     <p class="modal-sub" id="loginSub"></p>
     <div class="error-msg" id="loginError">Fehler</div>
+    <!-- Trick browser autofill -->
+    <input type="text" style="display:none" name="username_fake">
+    <input type="password" style="display:none" name="password_fake" autocomplete="new-password">
     <div id="loginUserField" class="field" style="display:none">
       <label>Fahrer auswaehlen</label>
       <select id="loginUserSelect"></select>
     </div>
     <div class="field">
       <label>Passwort</label>
-      <input type="password" id="loginPass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+      <input type="password" id="loginPass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn-ghost" onclick="closeLogin()">Abbrechen</button>
@@ -829,7 +832,7 @@ function deleteRide(rideId){
   var db=getDB(); var r=db.rides.find(function(x){return x.id===rideId;}); if(!r) return;
   window._delRideId=rideId;
   var b='<div style="background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:14px;margin-bottom:14px;font-size:13px"><strong>'+r.customerName+' | '+fmtDate(r.date)+' '+r.time+' Uhr</strong></div>';
-  b+='<div class="field"><label>Zentralen-Passwort bestaetigen</label><input type="password" id="delRidePass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*"></div>';
+  b+='<div class="field"><label>Zentralen-Passwort bestaetigen</label><input type="password" id="delRidePass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"></div>';
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" style="flex:1" onclick="closeGModal()">Abbrechen</button>';
   b+='<button class="btn btn-danger" style="flex:1" onclick="doDeleteRide()">Loeschen</button></div>';
   openGModal('Fahrt loeschen?','',b);
@@ -1294,7 +1297,7 @@ function renderAdminEmp(){
 function openNewEmp(){
   var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="eFirst" placeholder="Max"></div><div class="field"><label>Nachname</label><input type="text" id="eLast" placeholder="Mustermann"></div></div>';
   b+='<div class="field"><label>Benutzername</label><input type="text" id="eUser" placeholder="max.mustermann"></div>';
-  b+='<div class="field"><label>Passwort</label><input type="password" id="ePass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*"></div>';
+  b+='<div class="field"><label>Passwort</label><input type="password" id="ePass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1" onclick="saveEmp(null)">Anlegen</button></div>';
   openGModal('Neuer Mitarbeiter','',b);
 }
@@ -1304,7 +1307,7 @@ function openEditEmp(id){ window._editEmpId=id;
   var parts=e.name.split(' ');
   var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="eFirst" value="'+parts[0]+'"></div><div class="field"><label>Nachname</label><input type="text" id="eLast" value="'+parts.slice(1).join(' ')+'"></div></div>';
   b+='<div class="field"><label>Benutzername</label><input type="text" id="eUser" value="'+e.username+'"></div>';
-  b+='<div class="field"><label>Neues Passwort (leer = unveraendert)</label><input type="password" id="ePass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*"></div>';
+  b+='<div class="field"><label>Neues Passwort (leer = unveraendert)</label><input type="password" id="ePass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1" onclick="saveEmpCurrent()">Speichern</button></div>';
   openGModal('Mitarbeiter bearbeiten',e.name,b);
 }
@@ -1320,7 +1323,7 @@ function saveEmp(id){
 function confirmDelEmpBtn(btn){
   window._delEmpId=btn.dataset.id; var name=btn.dataset.name;
   var b='<div style="background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:14px;margin-bottom:14px"><strong>'+name+'</strong> wird geloescht.</div>';
-  b+='<div class="field"><label>Admin-Passwort bestaetigen</label><input type="password" id="delEmpPass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*"></div>';
+  b+='<div class="field"><label>Admin-Passwort bestaetigen</label><input type="password" id="delEmpPass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"></div>';
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-danger" style="flex:1" onclick="doDelEmp()">Loeschen</button></div>';
   openGModal('Mitarbeiter loeschen?','',b);
 }
@@ -1346,14 +1349,14 @@ function saveFirma(){
 function renderAdminPasswords(){
   var h='<div class="section-header"><div><div class="section-title">Passwoerter</div><div class="section-sub">Zugaenge fuer Zentrale und Admin</div></div></div>';
   h+='<div class="card"><div style="font-size:14px;font-weight:600;margin-bottom:16px">Zentrale</div>';
-  h+='<div class="field"><label>Aktuelles Passwort</label><input type="password" id="pwZentrAlt" placeholder="PIN" inputmode="numeric" pattern="[0-9]*"></div>';
-  h+='<div class="field"><label>Neues Passwort</label><input type="password" id="pwZentrNeu" placeholder="Neuer PIN" inputmode="numeric" pattern="[0-9]*"></div>';
-  h+='<div class="field"><label>Wiederholen</label><input type="password" id="pwZentrNeu2" placeholder="Wiederholen" inputmode="numeric" pattern="[0-9]*"></div>';
+  h+='<div class="field"><label>Aktuelles Passwort</label><input type="password" id="pwZentrAlt" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"></div>';
+  h+='<div class="field"><label>Neues Passwort</label><input type="password" id="pwZentrNeu" placeholder="Neuer PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
+  h+='<div class="field"><label>Wiederholen</label><input type="password" id="pwZentrNeu2" placeholder="Wiederholen" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
   h+='<button class="btn btn-primary" onclick="changePassword(this.dataset.w)" data-w="zentrale">Passwort aendern</button></div>';
   h+='<div class="card"><div style="font-size:14px;font-weight:600;margin-bottom:16px">Admin-Konsole</div>';
-  h+='<div class="field"><label>Aktuelles Passwort</label><input type="password" id="pwAdminAlt" placeholder="PIN" inputmode="numeric" pattern="[0-9]*"></div>';
-  h+='<div class="field"><label>Neues Passwort</label><input type="password" id="pwAdminNeu" placeholder="Neuer PIN" inputmode="numeric" pattern="[0-9]*"></div>';
-  h+='<div class="field"><label>Wiederholen</label><input type="password" id="pwAdminNeu2" placeholder="Wiederholen" inputmode="numeric" pattern="[0-9]*"></div>';
+  h+='<div class="field"><label>Aktuelles Passwort</label><input type="password" id="pwAdminAlt" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"></div>';
+  h+='<div class="field"><label>Neues Passwort</label><input type="password" id="pwAdminNeu" placeholder="Neuer PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
+  h+='<div class="field"><label>Wiederholen</label><input type="password" id="pwAdminNeu2" placeholder="Wiederholen" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
   h+='<button class="btn btn-primary" onclick="changePassword(this.dataset.w)" data-w="admin">Passwort aendern</button></div>';
   document.getElementById('mainContent').innerHTML=h;
 }

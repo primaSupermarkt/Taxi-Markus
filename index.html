@@ -996,47 +996,61 @@ function filterKunden(){
 }
 
 function customerFormHTML(cu){
-  var c=cu||{};
-  var vt=c.vehicleType||'taxi';
-  var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="cFirst" placeholder="Max" value="'+(c.firstName||'')+'"></div>';
-  b+='<div class="field"><label>Nachname</label><input type="text" id="cLast" placeholder="Mustermann" value="'+(c.lastName||'')+'"></div></div>';
-  b+='<div class="field"><label>Abholadresse</label><input type="text" id="cAddr" placeholder="Musterstrasse 1, 12345 Stadt" value="'+(c.pickupAddress||'')+'"></div>';
-  b+='<div class="field"><label>Standard-Zieladresse (optional)</label><input type="text" id="cDest" placeholder="z. B. Dialysezentrum" value="'+(c.usualDestination||'')+'"></div>';
-  // Fahrzeugtyp
-  b+='<div class="field"><label>Befoerderungsart</label>';
-  b+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">';
-  var vtypes=[['taxi','Taxi'],['rollstuhl','Rollstuhl'],['trage','Trage'],['liege','Liege']];
+  var co=cu||{};
+  var vt=co.vehicleType||'taxi';
+  var b='';
+  b+='<div class="field"><label>Vorname</label><input type="text" id="cFirst" placeholder="Max" value="'+(co.firstName||'')+'"></div>';
+  b+='<div class="field"><label>Nachname</label><input type="text" id="cLast" placeholder="Mustermann" value="'+(co.lastName||'')+'"></div>';
+  b+='<div class="field"><label>Abholadresse</label><input type="text" id="cAddr" placeholder="Musterstrasse 1, 12345 Stadt" value="'+(co.pickupAddress||'')+'"></div>';
+  b+='<div class="field"><label>Standard-Zieladresse (optional)</label><input type="text" id="cDest" placeholder="z. B. Dialysezentrum" value="'+(co.usualDestination||'')+'"></div>';
+
+  // Befoerderungsart - volle Breite, klare Labels
+  b+='<div class="field"><label>Befoerderungsart</label><div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">';
+  var vtypes=[['taxi','Taxi','Standard-Taxi'],['rollstuhl','Rollstuhl','Rollstuhlgerechtes Fahrzeug'],['trage','Trage','Tragestuhl erforderlich'],['liege','Liege','Liegetransport']];
   vtypes.forEach(function(vt2){
     var sel=vt===vt2[0];
-    b+='<label style="display:flex;align-items:center;gap:8px;background:'+(sel?'rgba(245,200,66,.15)':'var(--bg3)')+';border:1px solid '+(sel?'var(--accent)':'var(--border)')+';border-radius:8px;padding:10px 14px;cursor:pointer;font-size:13px">';
-    b+='<input type="radio" name="cVehicleType" value="'+vt2[0]+'"'+(sel?' checked':'')+' style="accent-color:var(--accent)"> '+vt2[1]+'</label>';
+    b+='<label style="display:flex;align-items:center;gap:12px;background:'+(sel?'rgba(245,200,66,.12)':'var(--bg3)')+';border:1px solid '+(sel?'var(--accent)':'var(--border)')+';border-radius:10px;padding:12px 16px;cursor:pointer">';
+    b+='<input type="radio" name="cVehicleType" value="'+vt2[0]+'"'+(sel?' checked':'')+' style="accent-color:var(--accent);width:18px;height:18px;flex-shrink:0">';
+    b+='<div><div style="font-size:14px;font-weight:600;color:#fff">'+vt2[1]+'</div>';
+    b+='<div style="font-size:12px;color:#9aa0b8">'+vt2[2]+'</div></div></label>';
   });
   b+='</div></div>';
+
   // Wiederkehrende Fahrten
-  b+='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:4px">';
-  b+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
-  b+='<div style="font-size:14px;font-weight:600">Wiederkehrende Fahrten</div>';
-  var recAkt=c.recurring&&c.recurring.active;
-  b+='<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="cRecActive"'+(recAkt?' checked':'')+' onchange="toggleRecurringForm()" style="accent-color:var(--accent)"> Aktiv</label></div>';
+  var recAkt=co.recurring&&co.recurring.active;
+  b+='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:4px">';
+  b+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:'+(recAkt?'16px':'0px')+'">';
+  b+='<div><div style="font-size:15px;font-weight:700">Regelfahrten</div>';
+  b+='<div style="font-size:12px;color:#9aa0b8;margin-top:2px">Automatisch wiederkehrende Termine</div></div>';
+  b+='<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600">';
+  b+='<input type="checkbox" id="cRecActive"'+(recAkt?' checked':'')+' onchange="toggleRecurringForm()" style="accent-color:var(--accent);width:18px;height:18px"> Aktiv</label></div>';
+
   b+='<div id="recurringForm" style="display:'+(recAkt?'block':'none')+'">';
-  b+='<div class="field"><label>Abholzeit</label><input type="time" id="cRecTime" value="'+(c.recurring&&c.recurring.time||'08:00')+'"></div>';
+  b+='<div class="field"><label>Abholzeit</label><input type="time" id="cRecTime" value="'+(co.recurring&&co.recurring.time||'08:00')+'" style="font-size:18px;text-align:center;padding:12px"></div>';
+
   b+='<div class="field"><label>Wochentage</label>';
-  b+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">';
+  b+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px">';
   var days=[['MO','Mo'],['DI','Di'],['MI','Mi'],['DO','Do'],['FR','Fr'],['SA','Sa'],['SO','So']];
-  var selDays=(c.recurring&&c.recurring.days)||[];
+  var selDays=(co.recurring&&co.recurring.days)||[];
   days.forEach(function(d){
     var isSel=selDays.indexOf(d[0])!==-1;
-    b+='<label style="display:flex;align-items:center;gap:4px;background:'+(isSel?'rgba(245,200,66,.15)':'var(--bg2)')+';border:1px solid '+(isSel?'var(--accent)':'var(--border)')+';border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;font-weight:600">';
-    b+='<input type="checkbox" name="cRecDay" value="'+d[0]+'"'+(isSel?' checked':'')+' style="accent-color:var(--accent)"> '+d[1]+'</label>';
+    b+='<label style="display:flex;flex-direction:column;align-items:center;gap:4px;background:'+(isSel?'rgba(245,200,66,.15)':'var(--bg2)')+';border:1px solid '+(isSel?'var(--accent)':'var(--border)')+';border-radius:8px;padding:8px 4px;cursor:pointer;text-align:center">';
+    b+='<input type="checkbox" name="cRecDay" value="'+d[0]+'"'+(isSel?' checked':'')+' style="accent-color:var(--accent)">';
+    b+='<span style="font-size:12px;font-weight:700;color:'+(isSel?'var(--accent)':'#b0b6cc')+'">'+d[1]+'</span></label>';
   });
   b+='</div></div>';
+
   b+='<div class="field"><label>Zeitraum</label>';
-  b+='<div style="display:flex;gap:8px;margin-top:4px">';
-  b+='<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="cRecPeriod" value="open"'+((!c.recurring||c.recurring.period==='open')?' checked':'')+' style="accent-color:var(--accent)"> Offenes Ende</label>';
-  b+='<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="cRecPeriod" value="until" style="accent-color:var(--accent)"> Bis Datum</label>';
-  b+='</div>';
-  b+='<div style="margin-top:8px"><input type="date" id="cRecUntil" value="'+(c.recurring&&c.recurring.until||'')+'" placeholder="Enddatum" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:#fff;font-size:13px;width:100%"></div>';
-  b+='</div>';
+  b+='<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">';
+  var isOpen=!co.recurring||co.recurring.period==='open'||!co.recurring.period;
+  b+='<label style="display:flex;align-items:center;gap:10px;background:'+(isOpen?'rgba(245,200,66,.1)':'var(--bg2)')+';border:1px solid '+(isOpen?'var(--accent)':'var(--border)')+';border-radius:8px;padding:12px 14px;cursor:pointer">';
+  b+='<input type="radio" name="cRecPeriod" value="open"'+(isOpen?' checked':'')+' style="accent-color:var(--accent);width:16px;height:16px">';
+  b+='<div><div style="font-size:13px;font-weight:600">Offenes Ende</div><div style="font-size:11px;color:#9aa0b8">Fahrten werden automatisch fortgefuehrt</div></div></label>';
+  b+='<label style="display:flex;align-items:center;gap:10px;background:'+(!isOpen?'rgba(245,200,66,.1)':'var(--bg2)')+';border:1px solid '+(!isOpen?'var(--accent)':'var(--border)')+';border-radius:8px;padding:12px 14px;cursor:pointer">';
+  b+='<input type="radio" name="cRecPeriod" value="until"'+(!isOpen?' checked':'')+' style="accent-color:var(--accent);width:16px;height:16px">';
+  b+='<div><div style="font-size:13px;font-weight:600">Bis Datum</div>';
+  b+='<input type="date" id="cRecUntil" value="'+(co.recurring&&co.recurring.until||'')+'" style="background:transparent;border:none;color:#fff;font-size:12px;margin-top:4px;padding:0;width:100%;outline:none"></div></label>';
+  b+='</div></div>';
   b+='</div></div>';
   return b;
 }

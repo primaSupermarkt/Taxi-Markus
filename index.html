@@ -819,6 +819,18 @@ function openNewRide(prefillDate){
   b+='<div class="two-col"><div class="field"><label>Datum</label><input type="date" id="nrDate" value="'+(prefillDate||todayStr())+'"></div>';
   b+='<div class="field"><label>Uhrzeit</label><input type="time" id="nrTime" value="12:00"></div></div>';
   b+='<div class="field"><label>Fahrer direkt zuweisen (optional)</label><select id="nrDriver">'+driverOpts+'</select></div>';
+  b+='<div class="field"><label>Erinnerung - Fahrt einplanen (optional)</label>';
+  b+='<select id="nrReminder" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%">';
+  b+='<option value="">Keine Erinnerung</option>';
+  b+='<option value="30">30 Minuten vorher</option>';
+  b+='<option value="60">1 Stunde vorher</option>';
+  b+='<option value="120">2 Stunden vorher</option>';
+  b+='<option value="180">3 Stunden vorher</option>';
+  b+='<option value="360">6 Stunden vorher</option>';
+  b+='<option value="720">12 Stunden vorher</option>';
+  b+='<option value="1440">1 Tag vorher</option>';
+  b+='<option value="2880">2 Tage vorher</option>';
+  b+='</select></div>';
   b+='<div style="display:flex;gap:8px;margin-top:4px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button>';
   b+='<button class="btn btn-primary" style="flex:1" onclick="saveNewRide()">Fahrt anlegen</button></div>';
   openGModal('Neue Fahrt anlegen','',b);
@@ -857,7 +869,11 @@ function saveNewRide(){
   }
   var db=getDB();
   var nrVt=document.getElementById('nrVehicleType'); var vehicleType=nrVt?nrVt.value:'taxi';
-  db.rides.push({id:uid(),customerName:(first+' '+last).trim(),pickupAddress:from,destination:to,vehicleType:vehicleType,date:date,time:time,status:driverId?'pending':'new',driverId:driverId||null,driverId2:null,createdAt:Date.now(),tsAccepted:null,tsDone:null,declineReason:null});
+  var nrRem=document.getElementById('nrReminder'); var reminderMins=nrRem&&nrRem.value?parseInt(nrRem.value):null;
+  // Calculate reminder timestamp
+  var rideTs=new Date(date+'T'+time+':00').getTime();
+  var reminderTs=reminderMins?rideTs-(reminderMins*60000):null;
+  db.rides.push({id:uid(),customerName:(first+' '+last).trim(),pickupAddress:from,destination:to,vehicleType:vehicleType,date:date,time:time,status:driverId?'pending':'new',driverId:driverId||null,driverId2:null,createdAt:Date.now(),tsAccepted:null,tsDone:null,declineReason:null,reminderMins:reminderMins,reminderTs:reminderTs,reminderDismissed:false});
   saveDB(db); closeGModal();
   if(zActiveTab===0) renderZToday(); else if(zActiveTab===1) renderZKalender();
 }
@@ -1661,6 +1677,85 @@ async function init(){
   refreshBranding();
   loadPasswords();
 }
+
+// ERINNERUNGS-CHECKER
+function checkReminders(){
+  if(currentRole!=='zentrale') return;
+  var db=getDB();
+  var now=Date.now();
+  var due=db.rides.filter(function(r){
+    return r.reminderTs && !r.reminderDismissed && r.status==='new' && r.reminderTs<=now && r.date>=todayStr();
+  });
+  if(!due.length) return;
+  // Show reminder banner if not already shown
+  var existing=document.getElementById('reminderBanner');
+  if(existing) return; // already showing
+  var r=due[0]; // Show first due reminder
+  var mins=Math.round((new Date(r.date+'T'+r.time+':00').getTime()-now)/60000);
+  var timeStr=mins<=0?'JETZT!':mins<60?'in '+mins+' Min':mins<120?'in 1 Std':mins<1440?'in '+Math.round(mins/60)+' Std':'in '+Math.round(mins/1440)+' Tag(en)';
+  var banner=document.createElement('div');
+  banner.id='reminderBanner';
+  banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999;background:linear-gradient(135deg,#e74c3c,#c0392b);padding:14px 16px;box-shadow:0 4px 20px rgba(0,0,0,.5)';
+  banner.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div style="flex:1"><div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7);margin-bottom:3px">Erinnerung</div><div style="font-size:15px;font-weight:700;color:#fff">'+r.customerName+'</div></div></div>';
+  document.body.appendChild(banner);
+}
+
+function dismissReminder(){
+  var rideId=window._currentReminderId;
+  var b=document.getElementById('reminderBanner');
+  if(b) b.remove();
+  var db=getDB();
+  var r=db.rides.find(function(x){return x.id===rideId;});
+  if(r){ r._reminderSnoozedUntil=Date.now()+(5*60000); saveDB(db); }
+}
+
+function reminderGoTo(){
+  var rideId=window._currentReminderId;
+  var b=document.getElementById('reminderBanner');
+  if(b) b.remove();
+  zActiveTab=0;
+  document.querySelectorAll('.nav-tab').forEach(function(t,i){t.classList.toggle('active',i===0);});
+  renderZToday();
+  setTimeout(function(){ openAssign(rideId); },300);
+}
+
+// Override checkReminders to respect snooze
+var _origCheckReminders=checkReminders;
+checkReminders=function(){
+  if(currentRole!=='zentrale') return;
+  var db=getDB();
+  var now=Date.now();
+  var due=db.rides.filter(function(r){
+    return r.reminderTs && !r.reminderDismissed && r.status==='new' && r.reminderTs<=now && r.date>=todayStr() && (!r._reminderSnoozedUntil||r._reminderSnoozedUntil<=now);
+  });
+  if(!due.length){ var ex=document.getElementById('reminderBanner'); if(ex) ex.remove(); return; }
+  var existing=document.getElementById('reminderBanner');
+  if(existing) return;
+  var r=due[0];
+  var mins=Math.round((new Date(r.date+'T'+r.time+':00').getTime()-now)/60000);
+  var timeStr=mins<=0?'JETZT SOFORT!':mins<60?'in '+mins+' Min':mins<120?'in 1 Std':mins<1440?'in '+Math.round(mins/60)+' Std':'in '+Math.round(mins/1440)+' Tag(en)';
+  var banner=document.createElement('div');
+  banner.id='reminderBanner';
+  banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#e74c3c,#c0392b);padding:14px 16px;box-shadow:0 4px 20px rgba(0,0,0,.5);animation:reminderPulse 2s ease-in-out infinite';
+  window._currentReminderId=r.id;
+  banner.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
+    +'<div style="flex:1">'
+    +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.8);margin-bottom:3px">Erinnerung - Fahrer zuweisen!</div>'
+    +'<div style="font-size:15px;font-weight:700;color:#fff">'+r.customerName+'</div>'
+    +'<div style="font-size:13px;color:rgba(255,255,255,.9);margin-top:2px">'+fmtDate(r.date)+' '+r.time+' Uhr - '+timeStr+'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">'
+    +'<button onclick="dismissReminder()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;padding:7px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">5 Min</button>'
+    +'<button onclick="reminderGoTo()" style="background:#fff;border:none;color:#c0392b;padding:7px 14px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:700">Zuweisen</button>'
+    +'</div></div>';
+  document.body.appendChild(banner);
+};
+
+// Add CSS for pulse animation
+document.head.insertAdjacentHTML('beforeend','<style>@keyframes reminderPulse{0%,100%{box-shadow:0 4px 20px rgba(231,76,60,.5)}50%{box-shadow:0 4px 40px rgba(231,76,60,.9),0 0 0 4px rgba(231,76,60,.3)}}</style>');
+
+// Start reminder check every 60 seconds
+setInterval(checkReminders, 60000);
 
 init();
 </script>

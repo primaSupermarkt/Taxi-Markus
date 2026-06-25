@@ -1064,8 +1064,9 @@ function customerFormHTML(cu){
   b+='<div><div style="font-size:13px;font-weight:600">Offenes Ende</div><div style="font-size:11px;color:#9aa0b8">Fahrten werden automatisch fortgefuehrt</div></div></label>';
   b+='<label style="display:flex;align-items:center;gap:10px;background:'+(!isOpen?'rgba(245,200,66,.1)':'var(--bg2)')+';border:1px solid '+(!isOpen?'var(--accent)':'var(--border)')+';border-radius:8px;padding:12px 14px;cursor:pointer">';
   b+='<input type="radio" name="cRecPeriod" value="until"'+(!isOpen?' checked':'')+' style="accent-color:var(--accent);width:16px;height:16px">';
-  b+='<div><div style="font-size:13px;font-weight:600">Bis Datum</div>';
-  b+='<input type="date" id="cRecUntil" value="'+(co.recurring&&co.recurring.until||'')+'" style="background:transparent;border:none;color:#fff;font-size:12px;margin-top:4px;padding:0;width:100%;outline:none"></div></label>';
+  b+='<div style="flex:1"><div style="font-size:13px;font-weight:600">Bis Datum</div>';
+  b+='<div style="font-size:11px;color:#9aa0b8;margin-top:2px">Enddatum festlegen</div></div></label>';
+  b+='<div style="margin-top:8px;padding:0 4px"><input type="date" id="cRecUntil" value="'+(co.recurring&&co.recurring.until||'')+'" style="background:var(--bg2);border:2px solid '+(!isOpen?'var(--accent)':'var(--border)')+';border-radius:10px;color:#fff;font-size:15px;padding:12px 14px;width:100%;outline:none;display:block"></div>';
   b+='</div></div>';
   b+='</div></div>';
 

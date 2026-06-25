@@ -1068,6 +1068,18 @@ function customerFormHTML(cu){
   b+='<input type="date" id="cRecUntil" value="'+(co.recurring&&co.recurring.until||'')+'" style="background:transparent;border:none;color:#fff;font-size:12px;margin-top:4px;padding:0;width:100%;outline:none"></div></label>';
   b+='</div></div>';
   b+='</div></div>';
+
+  // Erinnerung zur Zuweisung
+  var remVal=co.recurring&&co.recurring.reminderMins?String(co.recurring.reminderMins):'';
+  b+='<div class="field" style="margin-top:4px"><label>Erinnerung - Fahrer zuweisen</label>';
+  b+='<select id="cReminder" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%">';
+  b+='<option value="">Keine Erinnerung</option>';
+  [['30','30 Minuten vorher'],['60','1 Stunde vorher'],['120','2 Stunden vorher'],['180','3 Stunden vorher'],['360','6 Stunden vorher'],['720','12 Stunden vorher'],['1440','1 Tag vorher'],['2880','2 Tage vorher']].forEach(function(opt){
+    b+='<option value="'+opt[0]+'"'+(remVal===opt[0]?' selected':'')+'>'+opt[1]+'</option>';
+  });
+  b+='</select>';
+  b+='<div style="font-size:11px;color:#9aa0b8;margin-top:6px">Gilt fuer alle Regelfahrten dieses Kunden</div></div>';
+
   return b;
 }
 
@@ -1102,14 +1114,16 @@ function openEditCustomer(id){
 
 function getRecurringData(){
   var active=document.getElementById('cRecActive')&&document.getElementById('cRecActive').checked;
-  if(!active) return null;
+  var remEl=document.getElementById('cReminder');
+  var reminderMins=remEl&&remEl.value?parseInt(remEl.value):null;
+  if(!active) return reminderMins?{active:false,reminderMins:reminderMins}:null;
   var time=(document.getElementById('cRecTime').value||'08:00');
   var days=[];
   document.querySelectorAll('input[name="cRecDay"]:checked').forEach(function(cb){days.push(cb.value);});
   var periodEl=document.querySelector('input[name="cRecPeriod"]:checked');
   var period=periodEl?periodEl.value:'open';
   var until=document.getElementById('cRecUntil').value||null;
-  return {active:true,time:time,days:days,period:period,until:period==='until'?until:null};
+  return {active:true,time:time,days:days,period:period,until:period==='until'?until:null,reminderMins:reminderMins};
 }
 
 function saveCustomer(id){
@@ -1163,6 +1177,9 @@ function generateRecurringRides(db,cu){
       // Check not already existing
       var exists=db.rides.find(function(r){return r.recurringCustomerId===cu.id&&r.date===ds;});
       if(!exists){
+        var rideTs=new Date(ds+'T'+rec.time+':00').getTime();
+        var remMins=rec.reminderMins||null;
+        var remTs=remMins?rideTs-(remMins*60000):null;
         db.rides.push({
           id:uid(),
           customerName:cu.firstName+' '+cu.lastName,
@@ -1178,7 +1195,10 @@ function generateRecurringRides(db,cu){
           tsAccepted:null,
           tsDone:null,
           declineReason:null,
-          recurringCustomerId:cu.id
+          recurringCustomerId:cu.id,
+          reminderMins:remMins,
+          reminderTs:remTs,
+          reminderDismissed:false
         });
         count++;
       }

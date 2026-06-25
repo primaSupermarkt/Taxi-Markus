@@ -91,6 +91,12 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .empty-state{text-align:center;padding:40px 20px;color:#9aa0b8;}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 @media(max-width:500px){.tile-grid{grid-template-columns:1fr;}.tile-admin{grid-column:1;}.two-col{grid-template-columns:1fr;}}
+
+.pin-display{font-family:monospace;font-size:28px;letter-spacing:8px;text-align:center;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;min-height:54px;color:#fff;}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
+.pin-btn{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-size:20px;font-weight:600;color:#fff;cursor:pointer;text-align:center;transition:background .15s;}
+.pin-btn:active{background:var(--accent);color:#0d0f14;}
+.pin-btn-wide{grid-column:span 2;}
 </style>
 
 </head>
@@ -124,14 +130,14 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="error-msg" id="loginError">Fehler</div>
     <!-- Trick browser autofill -->
     <input type="text" style="display:none" name="username_fake">
-    <input type="password" style="display:none" name="password_fake" autocomplete="new-password">
+    <input type="text" style="display:none" name="password_fake" autocomplete="new-password">
     <div id="loginUserField" class="field" style="display:none">
       <label>Fahrer auswaehlen</label>
       <select id="loginUserSelect"></select>
     </div>
     <div class="field">
-      <label>Passwort</label>
-      <input type="password" id="loginPass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')doLogin()">
+      <label>PIN</label>
+      <input type="text" id="loginPass" placeholder="Tippe auf PIN eingeben" readonly style="cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%;font-family:monospace;font-size:18px;letter-spacing:4px;text-align:center" onclick="openPinPad('loginPass','PIN eingeben',doLogin)">
     </div>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn-ghost" onclick="closeLogin()">Abbrechen</button>
@@ -301,6 +307,47 @@ function pruneOldRides(db){
 // ═══════════════════════════════════════
 var currentRole=null, currentUser=null, loginTarget=null;
 
+// PIN PAD
+var _pinTarget = '';   // which input id to fill
+var _pinValue  = '';   // current digits
+
+function openPinPad(targetId, title, onConfirm) {
+  _pinTarget  = targetId;
+  _pinValue   = '';
+  window._pinConfirmCb = onConfirm;
+  var b = '<div id="pinDisplay" class="pin-display">&#8203;</div>';
+  b += '<div class="pin-grid">';
+  ['1','2','3','4','5','6','7','8','9'].forEach(function(d){
+    b += '<button class="pin-btn" onclick="pinPress(this.dataset.d)" data-d="'+d+'">'+d+'</button>';
+  });
+  b += '<button class="pin-btn" onclick="pinClear()">C</button>';
+  b += '<button class="pin-btn" onclick="pinPress(this.dataset.d)" data-d="0">0</button>';
+  b += '<button class="pin-btn" onclick="pinBack()">&#9003;</button>';
+  b += '</div>';
+  b += '<button class="btn btn-primary btn-full" onclick="pinConfirm()">Bestaetigen</button>';
+  openGModal(title || 'PIN eingeben', '', b);
+}
+
+function pinPress(d) {
+  if (_pinValue.length >= 8) return;
+  _pinValue += d;
+  updatePinDisplay();
+}
+function pinClear() { _pinValue = ''; updatePinDisplay(); }
+function pinBack()  { _pinValue = _pinValue.slice(0,-1); updatePinDisplay(); }
+function updatePinDisplay() {
+  var el = document.getElementById('pinDisplay');
+  if (el) el.textContent = _pinValue.replace(/./g,'*') || String.fromCharCode(8203);
+}
+function pinConfirm() {
+  if (_pinTarget) {
+    var el = document.getElementById(_pinTarget);
+    if (el) el.value = _pinValue;
+  }
+  if (window._pinConfirmCb) window._pinConfirmCb(_pinValue);
+  closeGModal();
+}
+
 function openLogin(role){
   if(!_localCache){
     // Firebase noch nicht bereit - kurz warten und nochmal versuchen
@@ -434,7 +481,12 @@ function rideCardZ(r,db){
   var h='<div class="card">';
   h+='<div class="card-header"><div>';
   h+='<div class="card-title">'+r.customerName+'</div>';
-  h+='<div class="card-sub">Von: '+r.pickupAddress+(r.destination?' &rarr; '+r.destination:'')+'</div>';
+  var vtLabels={taxi:'Taxi',rollstuhl:'Rollstuhl',trage:'Trage',liege:'Liege'};
+  var vtBadgeColor={rollstuhl:'rgba(231,76,60,.2)',trage:'rgba(243,156,18,.2)',liege:'rgba(243,156,18,.2)',taxi:'rgba(245,200,66,.1)'};
+  var vtTextColor={rollstuhl:'#e74c3c',trage:'#f39c12',liege:'#f39c12',taxi:'var(--accent)'};
+  var vt=r.vehicleType||'taxi';
+  var vtBadge=vt!=='taxi'?' <span style="background:'+vtBadgeColor[vt]+';color:'+vtTextColor[vt]+';border-radius:4px;font-size:10px;font-weight:700;padding:2px 8px;border:1px solid '+vtTextColor[vt].replace(')',', .4)').replace('rgb','rgba')+'">'+vtLabels[vt]+'</span>':'';
+  h+='<div class="card-sub">Von: '+r.pickupAddress+(r.destination?' &rarr; '+r.destination:'')+vtBadge+'</div>';
   h+='</div><span class="badge '+STATUS_BADGE[r.status]+'">'+STATUS_LABEL[r.status]+'</span></div>';
   h+='<div class="info-grid">';
   h+='<div class="info-item"><label>Datum</label><span>'+fmtDate(r.date)+'</span></div>';
@@ -758,6 +810,12 @@ function openNewRide(prefillDate){
   b+='<div class="field"><label>Nachname</label><input type="text" id="nrLast" placeholder="Mustermann" autocomplete="off" oninput="acLookup()"></div></div>';
   b+='<div class="field"><label>Abholadresse</label><input type="text" id="nrFrom" placeholder="Strasse, Ort" oninput="this._manuallyEdited=true"></div>';
   b+='<div class="field"><label>Zieladresse (optional)</label><input type="text" id="nrTo" placeholder="Zielstrasse, Ort" oninput="this._manuallyEdited=true"></div>';
+  b+='<div class="field"><label>Befoerderungsart</label><select id="nrVehicleType" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%">';
+  b+='<option value="taxi">Taxi (Standard)</option>';
+  b+='<option value="rollstuhl">Rollstuhl - Rollstuhlgerecht</option>';
+  b+='<option value="trage">Trage - Tragestuhl erforderlich</option>';
+  b+='<option value="liege">Liege - Liegetransport</option>';
+  b+='</select></div>';
   b+='<div class="two-col"><div class="field"><label>Datum</label><input type="date" id="nrDate" value="'+(prefillDate||todayStr())+'"></div>';
   b+='<div class="field"><label>Uhrzeit</label><input type="time" id="nrTime" value="12:00"></div></div>';
   b+='<div class="field"><label>Fahrer direkt zuweisen (optional)</label><select id="nrDriver">'+driverOpts+'</select></div>';
@@ -777,6 +835,9 @@ function acLookup(){
   if(!matches.length) return;
   var match=matches[0];
   var fromEl=document.getElementById('nrFrom'); if(fromEl&&!fromEl._manuallyEdited) fromEl.value=match.pickupAddress;
+  // Also set vehicle type if field exists
+  var vtEl=document.getElementById('nrVehicleType');
+  if(vtEl&&match.vehicleType) vtEl.value=match.vehicleType;
   var toEl=document.getElementById('nrTo'); if(toEl&&!toEl._manuallyEdited&&match.usualDestination) toEl.value=match.usualDestination;
 }
 
@@ -795,7 +856,8 @@ function saveNewRide(){
     return;
   }
   var db=getDB();
-  db.rides.push({id:uid(),customerName:(first+' '+last).trim(),pickupAddress:from,destination:to,date:date,time:time,status:driverId?'pending':'new',driverId:driverId||null,driverId2:null,createdAt:Date.now(),tsAccepted:null,tsDone:null,declineReason:null});
+  var nrVt=document.getElementById('nrVehicleType'); var vehicleType=nrVt?nrVt.value:'taxi';
+  db.rides.push({id:uid(),customerName:(first+' '+last).trim(),pickupAddress:from,destination:to,vehicleType:vehicleType,date:date,time:time,status:driverId?'pending':'new',driverId:driverId||null,driverId2:null,createdAt:Date.now(),tsAccepted:null,tsDone:null,declineReason:null});
   saveDB(db); closeGModal();
   if(zActiveTab===0) renderZToday(); else if(zActiveTab===1) renderZKalender();
 }
@@ -832,7 +894,8 @@ function deleteRide(rideId){
   var db=getDB(); var r=db.rides.find(function(x){return x.id===rideId;}); if(!r) return;
   window._delRideId=rideId;
   var b='<div style="background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:14px;margin-bottom:14px;font-size:13px"><strong>'+r.customerName+' | '+fmtDate(r.date)+' '+r.time+' Uhr</strong></div>';
-  b+='<div class="field"><label>Zentralen-Passwort bestaetigen</label><input type="password" id="delRidePass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"></div>';
+  b+='<input type="text" id="delRidePass" style="display:none">';
+  b+='<button class="btn btn-ghost btn-full" style="margin-bottom:8px" onclick="openPinPad(this.dataset.t,this.dataset.l,doDeleteRide)" data-t="delRidePass" data-l="PIN bestaetigen">PIN eingeben</button>';  
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" style="flex:1" onclick="closeGModal()">Abbrechen</button>';
   b+='<button class="btn btn-danger" style="flex:1" onclick="doDeleteRide()">Loeschen</button></div>';
   openGModal('Fahrt loeschen?','',b);
@@ -882,14 +945,25 @@ function renderZKunden(){
   if(!sorted.length){ h+='<div class="empty-state"><p>Noch keine Kunden.</p></div>'; }
   else{
     h+='<div id="kundenTabelle"><div class="table-wrap"><table>';
-    h+='<tr><th>Nachname</th><th>Vorname</th><th>Abholadresse</th><th>Standard-Ziel</th><th></th></tr>';
+    h+='<tr><th>Nachname</th><th>Vorname</th><th>Abholadresse</th><th>Fahrzeug</th><th>Regelfahrten</th><th></th></tr>';
     sorted.forEach(function(cu){
       var key=normalize(cu.firstName)+'|'+normalize(cu.lastName);
       var isDup=dupNames[key]>1;
+      var vtIcons={taxi:'Taxi',rollstuhl:'Rollstuhl',trage:'Trage',liege:'Liege'};
+      var vtLabel=vtIcons[cu.vehicleType||'taxi']||'Taxi';
+      var recActive=cu.recurring&&cu.recurring.active;
+      var recDays=cu.recurring&&cu.recurring.days?(cu.recurring.days.join(', ')):'';
       h+='<tr style="'+(isDup?'background:rgba(231,76,60,.08);':'')+'">';
       h+='<td><strong>'+cu.lastName+'</strong>'+(isDup?' <span style="background:rgba(231,76,60,.2);color:#e74c3c;border-radius:4px;font-size:10px;font-weight:700;padding:1px 6px">Doppelt</span>':'')+' </td>';
-      h+='<td>'+cu.firstName+'</td><td>'+cu.pickupAddress+'</td><td>'+(cu.usualDestination||'-')+'</td>';
-      h+='<td><button class="btn btn-danger" style="padding:4px 10px;font-size:12px" onclick="delCustomer(this.dataset.id)" data-id="'+cu.id+'">X</button></td></tr>';
+      h+='<td>'+cu.firstName+'</td>';
+      h+='<td>'+cu.pickupAddress+'</td>';
+      h+='<td><span style="background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.3);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">'+vtLabel+'</span></td>';
+      h+='<td>'+(recActive?'<span style="color:#2ecc71;font-size:12px;font-weight:600">'+recDays+'</span>':'<span style="color:#9aa0b8;font-size:12px">-</span>')+'</td>';
+      h+='<td><div style="display:flex;gap:4px">';
+      h+='<button class="btn btn-ghost" style="padding:4px 8px;font-size:11px" onclick="openEditCustomer(this.dataset.id)" data-id="'+cu.id+'">Edit</button>';
+      if(cu.recurring){h+='<button class="btn btn-ghost" style="padding:4px 8px;font-size:11px;color:'+(recActive?'#e74c3c':'#2ecc71')+'" onclick="toggleRecurring(this.dataset.id)" data-id="'+cu.id+'">'+(recActive?'Pause':'Start')+'</button>';}
+      h+='<button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="delCustomer(this.dataset.id)" data-id="'+cu.id+'">X</button>';
+      h+='</div></td></tr>';
     });
     h+='</table></div></div>';
   }
@@ -909,7 +983,7 @@ function filterKunden(){
   if(!hits.length){ h='<div style="background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.3);border-radius:10px;padding:16px;text-align:center"><div style="font-size:15px;font-weight:600;color:#e74c3c;margin-bottom:4px">Nicht gefunden</div><div style="font-size:13px;color:#b0b6cc;margin-bottom:12px">Kein Kunde mit diesem Namen.</div><button class="btn btn-primary" onclick="openNewCustomer()">+ Jetzt anlegen</button></div>'; }
   else{
     h='<div style="font-size:13px;color:#b0b6cc;margin-bottom:10px"><strong style="color:#fff">'+hits.length+'</strong> Treffer</div>';
-    h+='<div class="table-wrap"><table><tr><th>Nachname</th><th>Vorname</th><th>Abholadresse</th><th>Standard-Ziel</th><th></th></tr>';
+    h+='<div class="table-wrap"><table><tr><th>Nachname</th><th>Vorname</th><th>Abholadresse</th><th>Fahrzeug</th><th></th></tr>';
     hits.sort(function(a,b){return (a.lastName+'|'+a.firstName).localeCompare(b.lastName+'|'+b.firstName,'de');});
     hits.forEach(function(cu){
       var key=normalize(cu.firstName)+'|'+normalize(cu.lastName); var isDup=dupNames[key]>1;
@@ -921,22 +995,172 @@ function filterKunden(){
   if(resultEl) resultEl.innerHTML=h;
 }
 
+function customerFormHTML(cu){
+  var c=cu||{};
+  var vt=c.vehicleType||'taxi';
+  var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="cFirst" placeholder="Max" value="'+(c.firstName||'')+'"></div>';
+  b+='<div class="field"><label>Nachname</label><input type="text" id="cLast" placeholder="Mustermann" value="'+(c.lastName||'')+'"></div></div>';
+  b+='<div class="field"><label>Abholadresse</label><input type="text" id="cAddr" placeholder="Musterstrasse 1, 12345 Stadt" value="'+(c.pickupAddress||'')+'"></div>';
+  b+='<div class="field"><label>Standard-Zieladresse (optional)</label><input type="text" id="cDest" placeholder="z. B. Dialysezentrum" value="'+(c.usualDestination||'')+'"></div>';
+  // Fahrzeugtyp
+  b+='<div class="field"><label>Befoerderungsart</label>';
+  b+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">';
+  var vtypes=[['taxi','Taxi'],['rollstuhl','Rollstuhl'],['trage','Trage'],['liege','Liege']];
+  vtypes.forEach(function(vt2){
+    var sel=vt===vt2[0];
+    b+='<label style="display:flex;align-items:center;gap:8px;background:'+(sel?'rgba(245,200,66,.15)':'var(--bg3)')+';border:1px solid '+(sel?'var(--accent)':'var(--border)')+';border-radius:8px;padding:10px 14px;cursor:pointer;font-size:13px">';
+    b+='<input type="radio" name="cVehicleType" value="'+vt2[0]+'"'+(sel?' checked':'')+' style="accent-color:var(--accent)"> '+vt2[1]+'</label>';
+  });
+  b+='</div></div>';
+  // Wiederkehrende Fahrten
+  b+='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:4px">';
+  b+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  b+='<div style="font-size:14px;font-weight:600">Wiederkehrende Fahrten</div>';
+  var recAkt=c.recurring&&c.recurring.active;
+  b+='<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="cRecActive"'+(recAkt?' checked':'')+' onchange="toggleRecurringForm()" style="accent-color:var(--accent)"> Aktiv</label></div>';
+  b+='<div id="recurringForm" style="display:'+(recAkt?'block':'none')+'">';
+  b+='<div class="field"><label>Abholzeit</label><input type="time" id="cRecTime" value="'+(c.recurring&&c.recurring.time||'08:00')+'"></div>';
+  b+='<div class="field"><label>Wochentage</label>';
+  b+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">';
+  var days=[['MO','Mo'],['DI','Di'],['MI','Mi'],['DO','Do'],['FR','Fr'],['SA','Sa'],['SO','So']];
+  var selDays=(c.recurring&&c.recurring.days)||[];
+  days.forEach(function(d){
+    var isSel=selDays.indexOf(d[0])!==-1;
+    b+='<label style="display:flex;align-items:center;gap:4px;background:'+(isSel?'rgba(245,200,66,.15)':'var(--bg2)')+';border:1px solid '+(isSel?'var(--accent)':'var(--border)')+';border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;font-weight:600">';
+    b+='<input type="checkbox" name="cRecDay" value="'+d[0]+'"'+(isSel?' checked':'')+' style="accent-color:var(--accent)"> '+d[1]+'</label>';
+  });
+  b+='</div></div>';
+  b+='<div class="field"><label>Zeitraum</label>';
+  b+='<div style="display:flex;gap:8px;margin-top:4px">';
+  b+='<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="cRecPeriod" value="open"'+((!c.recurring||c.recurring.period==='open')?' checked':'')+' style="accent-color:var(--accent)"> Offenes Ende</label>';
+  b+='<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="cRecPeriod" value="until" style="accent-color:var(--accent)"> Bis Datum</label>';
+  b+='</div>';
+  b+='<div style="margin-top:8px"><input type="date" id="cRecUntil" value="'+(c.recurring&&c.recurring.until||'')+'" placeholder="Enddatum" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:#fff;font-size:13px;width:100%"></div>';
+  b+='</div>';
+  b+='</div></div>';
+  return b;
+}
+
+function toggleRecurringForm(){
+  var cb=document.getElementById('cRecActive');
+  var form=document.getElementById('recurringForm');
+  if(form) form.style.display=cb&&cb.checked?'block':'none';
+}
+
 function openNewCustomer(){
-  var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="cFirst" placeholder="Max"></div>';
-  b+='<div class="field"><label>Nachname</label><input type="text" id="cLast" placeholder="Mustermann"></div></div>';
-  b+='<div class="field"><label>Abholadresse</label><input type="text" id="cAddr" placeholder="Musterstrasse 1, 12345 Stadt"></div>';
-  b+='<div class="field"><label>Standard-Zieladresse (optional)</label><input type="text" id="cDest" placeholder="z. B. Dialysezentrum, Klinikstrasse 5"></div>';
-  b+='<div style="display:flex;gap:8px;margin-top:4px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button>';
-  b+='<button class="btn btn-primary" style="flex:1" onclick="saveCustomer()">Speichern</button></div>';
+  var b=customerFormHTML(null);
+  b+='<div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button>';
+  b+='<button class="btn btn-primary" style="flex:1" onclick="saveCustomer(null)">Speichern</button></div>';
   openGModal('Neuer Kunde','Kundenstammdaten erfassen',b);
 }
-function saveCustomer(){
-  var first=(document.getElementById('cFirst').value||'').trim(); var last=(document.getElementById('cLast').value||'').trim();
-  var addr=(document.getElementById('cAddr').value||'').trim(); var dest=(document.getElementById('cDest').value||'').trim();
+
+function openEditCustomer(id){
+  var db=getDB(); var cu=db.customers.find(function(x){return x.id===id;}); if(!cu) return;
+  window._editCuId=id;
+  var b=customerFormHTML(cu);
+  b+='<div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button>';
+  b+='<button class="btn btn-primary" style="flex:1" onclick="saveCustomer(\''+id+'\')">Speichern</button></div>';
+  openGModal('Kunde bearbeiten',cu.firstName+' '+cu.lastName,b);
+}
+
+function getRecurringData(){
+  var active=document.getElementById('cRecActive')&&document.getElementById('cRecActive').checked;
+  if(!active) return null;
+  var time=(document.getElementById('cRecTime').value||'08:00');
+  var days=[];
+  document.querySelectorAll('input[name="cRecDay"]:checked').forEach(function(cb){days.push(cb.value);});
+  var periodEl=document.querySelector('input[name="cRecPeriod"]:checked');
+  var period=periodEl?periodEl.value:'open';
+  var until=document.getElementById('cRecUntil').value||null;
+  return {active:true,time:time,days:days,period:period,until:period==='until'?until:null};
+}
+
+function saveCustomer(id){
+  var first=(document.getElementById('cFirst').value||'').trim();
+  var last=(document.getElementById('cLast').value||'').trim();
+  var addr=(document.getElementById('cAddr').value||'').trim();
+  var dest=(document.getElementById('cDest').value||'').trim();
+  var vtEl=document.querySelector('input[name="cVehicleType"]:checked');
+  var vehicleType=vtEl?vtEl.value:'taxi';
+  var recurring=getRecurringData();
   if(!first||!last||!addr){ alert('Vorname, Nachname und Adresse sind Pflicht.'); return; }
   var db=getDB();
-  db.customers.push({id:uid(),firstName:first,lastName:last,pickupAddress:addr,usualDestination:dest||null});
+  if(id){
+    var cu=db.customers.find(function(x){return x.id===id;});
+    if(cu){
+      cu.firstName=first; cu.lastName=last; cu.pickupAddress=addr;
+      cu.usualDestination=dest||null; cu.vehicleType=vehicleType; cu.recurring=recurring;
+      // Regenerate recurring rides
+      removeRecurringRides(db,id);
+      if(recurring&&recurring.active) generateRecurringRides(db,cu);
+    }
+  } else {
+    var newCu={id:uid(),firstName:first,lastName:last,pickupAddress:addr,usualDestination:dest||null,vehicleType:vehicleType,recurring:recurring};
+    db.customers.push(newCu);
+    if(recurring&&recurring.active) generateRecurringRides(db,newCu);
+  }
   saveDB(db); closeGModal(); renderZKunden();
+}
+
+function removeRecurringRides(db,customerId){
+  db.rides=db.rides.filter(function(r){return r.recurringCustomerId!==customerId;});
+}
+
+function generateRecurringRides(db,cu){
+  var rec=cu.recurring; if(!rec||!rec.active||!rec.days||!rec.days.length) return;
+  var dayMap={MO:1,DI:2,MI:3,DO:4,FR:5,SA:6,SO:0};
+  var start=new Date(); start.setHours(0,0,0,0);
+  var end;
+  if(rec.period==='until'&&rec.until){
+    end=new Date(rec.until); end.setHours(23,59,59,0);
+  } else {
+    end=new Date(); end.setFullYear(end.getFullYear()+2); // offenes Ende = 2 Jahre voraus
+  }
+  var current=new Date(start);
+  var count=0;
+  while(current<=end && count<500){
+    var dow=current.getDay();
+    var matched=rec.days.find(function(d){return dayMap[d]===dow;});
+    if(matched){
+      var ds=current.getFullYear()+'-'+pad(current.getMonth()+1)+'-'+pad(current.getDate());
+      // Check not already existing
+      var exists=db.rides.find(function(r){return r.recurringCustomerId===cu.id&&r.date===ds;});
+      if(!exists){
+        db.rides.push({
+          id:uid(),
+          customerName:cu.firstName+' '+cu.lastName,
+          pickupAddress:cu.pickupAddress,
+          destination:cu.usualDestination||'',
+          vehicleType:cu.vehicleType||'taxi',
+          date:ds,
+          time:rec.time,
+          status:'new',
+          driverId:null,
+          driverId2:null,
+          createdAt:Date.now(),
+          tsAccepted:null,
+          tsDone:null,
+          declineReason:null,
+          recurringCustomerId:cu.id
+        });
+        count++;
+      }
+    }
+    current.setDate(current.getDate()+1);
+  }
+}
+
+function toggleRecurring(customerId){
+  var db=getDB();
+  var cu=db.customers.find(function(x){return x.id===customerId;});
+  if(!cu||!cu.recurring) return;
+  cu.recurring.active=!cu.recurring.active;
+  if(cu.recurring.active){
+    generateRecurringRides(db,cu);
+  } else {
+    removeRecurringRides(db,customerId);
+  }
+  saveDB(db); renderZKunden();
 }
 function delCustomer(id){
   window._delCustomerId=id; var db=getDB(); var cu=db.customers.find(function(x){return x.id===id;}); if(!cu) return;
@@ -1200,6 +1424,14 @@ function fahrerCard(r){
   h+='<div class="card-sub">'+r.pickupAddress+(r.destination?' &gt; '+r.destination:'')+(isBackup?' <span style="background:rgba(243,156,18,.15);color:#f39c12;border-radius:4px;font-size:10px;font-weight:700;padding:1px 5px">BACKUP</span>':'')+'</div>';
   h+='</div><span class="badge '+STATUS_BADGE[r.status]+'">'+STATUS_LABEL[r.status]+'</span></div>';
   h+='<div class="info-grid"><div class="info-item"><label>Datum</label><span>'+fmtDate(r.date)+'</span></div><div class="info-item"><label>Uhrzeit</label><span>'+r.time+' Uhr</span></div></div>';
+  // Warnung bei besonderer Befoerderungsart
+  var vtWarn={rollstuhl:'Rollstuhlgerecht - Rollstuhl mitnehmen!',trage:'Tragestuhl erforderlich!',liege:'Liegetransport - Trage mitnehmen!'};
+  if(r.vehicleType&&vtWarn[r.vehicleType]){
+    h+='<div style="background:rgba(231,76,60,.15);border:1px solid rgba(231,76,60,.5);border-radius:8px;padding:12px 14px;margin-bottom:4px;display:flex;align-items:center;gap:10px">';
+    h+='<span style="font-size:20px">!</span>';
+    h+='<div><div style="font-size:12px;color:#e74c3c;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Achtung</div>';
+    h+='<div style="font-size:14px;font-weight:600;color:#fff">'+vtWarn[r.vehicleType]+'</div></div></div>';
+  }
   if(r.status==='pending'){
     h+='<div class="btn-row"><button class="btn btn-success" onclick="fahrerAccept(this.dataset.id)" data-id="'+r.id+'">Annehmen</button>';
     h+='<button class="btn btn-danger" onclick="fahrerDeclinePrompt(this.dataset.id)" data-id="'+r.id+'">Ablehnen</button></div>';
@@ -1297,7 +1529,7 @@ function renderAdminEmp(){
 function openNewEmp(){
   var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="eFirst" placeholder="Max"></div><div class="field"><label>Nachname</label><input type="text" id="eLast" placeholder="Mustermann"></div></div>';
   b+='<div class="field"><label>Benutzername</label><input type="text" id="eUser" placeholder="max.mustermann"></div>';
-  b+='<div class="field"><label>Passwort</label><input type="password" id="ePass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
+  b+='<div class="field"><label>PIN fuer Fahrer</label><input type="text" id="ePass" placeholder="PIN tippen" readonly style="cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#fff;width:100%;font-family:monospace;letter-spacing:4px;font-size:16px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="ePass" data-l="Fahrer-PIN setzen"></div>';
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1" onclick="saveEmp(null)">Anlegen</button></div>';
   openGModal('Neuer Mitarbeiter','',b);
 }
@@ -1307,7 +1539,7 @@ function openEditEmp(id){ window._editEmpId=id;
   var parts=e.name.split(' ');
   var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="eFirst" value="'+parts[0]+'"></div><div class="field"><label>Nachname</label><input type="text" id="eLast" value="'+parts.slice(1).join(' ')+'"></div></div>';
   b+='<div class="field"><label>Benutzername</label><input type="text" id="eUser" value="'+e.username+'"></div>';
-  b+='<div class="field"><label>Neues Passwort (leer = unveraendert)</label><input type="password" id="ePass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
+  b+='<div class="field"><label>Neuer PIN (leer lassen = unveraendert)</label><input type="text" id="ePass" placeholder="PIN tippen" readonly style="cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#fff;width:100%;font-family:monospace;letter-spacing:4px;font-size:16px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="ePass" data-l="Neuer Fahrer-PIN"></div>';
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1" onclick="saveEmpCurrent()">Speichern</button></div>';
   openGModal('Mitarbeiter bearbeiten',e.name,b);
 }
@@ -1323,7 +1555,8 @@ function saveEmp(id){
 function confirmDelEmpBtn(btn){
   window._delEmpId=btn.dataset.id; var name=btn.dataset.name;
   var b='<div style="background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:14px;margin-bottom:14px"><strong>'+name+'</strong> wird geloescht.</div>';
-  b+='<div class="field"><label>Admin-Passwort bestaetigen</label><input type="password" id="delEmpPass" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"></div>';
+  b+='<input type="text" id="delEmpPass" style="display:none">';
+  b+='<button class="btn btn-ghost btn-full" style="margin-bottom:8px" onclick="openPinPad(this.dataset.t,this.dataset.l,doDelEmp)" data-t="delEmpPass" data-l="Admin-PIN bestaetigen">PIN eingeben</button>'; 
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-danger" style="flex:1" onclick="doDelEmp()">Loeschen</button></div>';
   openGModal('Mitarbeiter loeschen?','',b);
 }
@@ -1349,14 +1582,14 @@ function saveFirma(){
 function renderAdminPasswords(){
   var h='<div class="section-header"><div><div class="section-title">Passwoerter</div><div class="section-sub">Zugaenge fuer Zentrale und Admin</div></div></div>';
   h+='<div class="card"><div style="font-size:14px;font-weight:600;margin-bottom:16px">Zentrale</div>';
-  h+='<div class="field"><label>Aktuelles Passwort</label><input type="password" id="pwZentrAlt" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"></div>';
-  h+='<div class="field"><label>Neues Passwort</label><input type="password" id="pwZentrNeu" placeholder="Neuer PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
-  h+='<div class="field"><label>Wiederholen</label><input type="password" id="pwZentrNeu2" placeholder="Wiederholen" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
+  h+='<div class="field"><label>Aktuelles Passwort</label><input type="text" id="pwZentrAlt" placeholder="PIN tippen..." readonly style="cursor:pointer;font-family:monospace;letter-spacing:4px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="pwZentrAlt" data-l="Aktuellen PIN eingeben"></div>';
+  h+='<div class="field"><label>Neues Passwort</label><input type="text" id="pwZentrNeu" placeholder="Neuen PIN tippen..." readonly style="cursor:pointer;font-family:monospace;letter-spacing:4px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="pwZentrNeu" data-l="Neuen PIN eingeben"></div>';
+  h+='<div class="field"><label>Wiederholen</label><input type="text" id="pwZentrNeu2" placeholder="Wiederholen..." readonly style="cursor:pointer;font-family:monospace;letter-spacing:4px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="pwZentrNeu2" data-l="PIN wiederholen"></div>';
   h+='<button class="btn btn-primary" onclick="changePassword(this.dataset.w)" data-w="zentrale">Passwort aendern</button></div>';
   h+='<div class="card"><div style="font-size:14px;font-weight:600;margin-bottom:16px">Admin-Konsole</div>';
-  h+='<div class="field"><label>Aktuelles Passwort</label><input type="password" id="pwAdminAlt" placeholder="PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"></div>';
-  h+='<div class="field"><label>Neues Passwort</label><input type="password" id="pwAdminNeu" placeholder="Neuer PIN" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
-  h+='<div class="field"><label>Wiederholen</label><input type="password" id="pwAdminNeu2" placeholder="Wiederholen" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password"></div>';
+  h+='<div class="field"><label>Aktuelles Passwort</label><input type="text" id="pwAdminAlt" placeholder="PIN tippen..." readonly style="cursor:pointer;font-family:monospace;letter-spacing:4px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="pwAdminAlt" data-l="Aktuellen PIN eingeben"></div>';
+  h+='<div class="field"><label>Neues Passwort</label><input type="text" id="pwAdminNeu" placeholder="Neuen PIN tippen..." readonly style="cursor:pointer;font-family:monospace;letter-spacing:4px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="pwAdminNeu" data-l="Neuen PIN eingeben"></div>';
+  h+='<div class="field"><label>Wiederholen</label><input type="text" id="pwAdminNeu2" placeholder="Wiederholen..." readonly style="cursor:pointer;font-family:monospace;letter-spacing:4px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="pwAdminNeu2" data-l="PIN wiederholen"></div>';
   h+='<button class="btn btn-primary" onclick="changePassword(this.dataset.w)" data-w="admin">Passwort aendern</button></div>';
   document.getElementById('mainContent').innerHTML=h;
 }

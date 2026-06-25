@@ -1062,19 +1062,26 @@ function toggleRecurringForm(){
 }
 
 function openNewCustomer(){
-  var b=customerFormHTML(null);
-  b+='<div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button>';
-  b+='<button class="btn btn-primary" style="flex:1" onclick="saveCustomer(null)">Speichern</button></div>';
-  openGModal('Neuer Kunde','Kundenstammdaten erfassen',b);
+  var h='<div class="section-header"><div><div class="section-title">Neuer Kunde</div></div>';
+  h+='<button class="btn btn-ghost" onclick="renderZKunden()">Abbrechen</button></div>';
+  h+=customerFormHTML(null);
+  h+='<div style="display:flex;gap:8px;margin-top:20px;margin-bottom:40px">';
+  h+='<button class="btn btn-ghost" style="flex:1" onclick="renderZKunden()">Abbrechen</button>';
+  h+='<button class="btn btn-primary" style="flex:1" onclick="saveCustomer(null)">Speichern</button></div>';
+  document.getElementById('mainContent').innerHTML=h;
 }
 
 function openEditCustomer(id){
   var db=getDB(); var cu=db.customers.find(function(x){return x.id===id;}); if(!cu) return;
   window._editCuId=id;
-  var b=customerFormHTML(cu);
-  b+='<div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button>';
-  b+='<button class="btn btn-primary" style="flex:1" onclick="saveCustomer(\''+id+'\')">Speichern</button></div>';
-  openGModal('Kunde bearbeiten',cu.firstName+' '+cu.lastName,b);
+  var h='<div class="section-header"><div><div class="section-title">Kunde bearbeiten</div>';
+  h+='<div class="section-sub">'+cu.firstName+' '+cu.lastName+'</div></div>';
+  h+='<button class="btn btn-ghost" onclick="renderZKunden()">Abbrechen</button></div>';
+  h+=customerFormHTML(cu);
+  h+='<div style="display:flex;gap:8px;margin-top:20px;margin-bottom:40px">';
+  h+='<button class="btn btn-ghost" style="flex:1" onclick="renderZKunden()">Abbrechen</button>';
+  h+='<button class="btn btn-primary" style="flex:1" onclick="saveCustomer(\''+id+'\')">Speichern</button></div>';
+  document.getElementById('mainContent').innerHTML=h;
 }
 
 function getRecurringData(){

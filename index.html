@@ -865,7 +865,7 @@ function saveNewRide(){
   if(!first||!last||!from||!date||!time){ alert('Bitte alle Pflichtfelder ausfuellen.'); return; }
   var rideDateTime=new Date(date+'T'+time+':00');
   if(rideDateTime<new Date()){
-    openGModal('Fahrt nicht moeglich','','<div style="background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:10px;padding:20px;text-align:center;margin-bottom:16px"><div style="font-size:28px;margin-bottom:8px">!</div><div style="font-size:15px;font-weight:600;color:#e74c3c;margin-bottom:4px">Zeit liegt in der Vergangenheit</div><div style="font-size:13px;color:#b0b6cc">Fahrtaufnahme nicht moeglich.</div></div><button class="btn btn-ghost btn-full" onclick="closeGModal()">Zurueck</button>');
+    alert('Achtung: Zeit liegt in der Vergangenheit. Bitte korrigieren.');
     return;
   }
   var db=getDB();
@@ -1600,7 +1600,7 @@ function renderAdminEmp(){
 function openNewEmp(){
   var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="eFirst" placeholder="Max"></div><div class="field"><label>Nachname</label><input type="text" id="eLast" placeholder="Mustermann"></div></div>';
   b+='<div class="field"><label>Benutzername</label><input type="text" id="eUser" placeholder="max.mustermann"></div>';
-  b+='<div class="field"><label>PIN fuer Fahrer</label><input type="text" id="ePass" placeholder="PIN tippen" readonly style="cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#fff;width:100%;font-family:monospace;letter-spacing:4px;font-size:16px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="ePass" data-l="Fahrer-PIN setzen"></div>';
+  b+='<div class="field"><label>PIN fuer Fahrer</label><input type="password" inputmode="numeric" id="ePass" placeholder="PIN eingeben" style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#fff;width:100%;font-size:16px"></div>';
   b+='<div class="field"><label>WhatsApp Nummer (z.B. 4917612345678)</label><input type="text" id="eWhatsapp" placeholder="4917612345678"></div>';
   b+='<div class="field"><label>CallMeBot API Key</label><input type="text" id="eApiKey" placeholder="API Key"></div>';
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1" onclick="saveEmp(null)">Anlegen</button></div>';
@@ -1612,7 +1612,7 @@ function openEditEmp(id){ window._editEmpId=id;
   var parts=e.name.split(' ');
   var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="eFirst" value="'+parts[0]+'"></div><div class="field"><label>Nachname</label><input type="text" id="eLast" value="'+parts.slice(1).join(' ')+'"></div></div>';
   b+='<div class="field"><label>Benutzername</label><input type="text" id="eUser" value="'+e.username+'"></div>';
-  b+='<div class="field"><label>Neuer PIN (leer lassen = unveraendert)</label><input type="text" id="ePass" placeholder="PIN tippen" readonly style="cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#fff;width:100%;font-family:monospace;letter-spacing:4px;font-size:16px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="ePass" data-l="Neuer Fahrer-PIN"></div>';
+  b+='<div class="field"><label>Neuer PIN (leer lassen = unveraendert)</label><input type="password" inputmode="numeric" id="ePass" placeholder="Leer lassen = unveraendert" style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#fff;width:100%;font-size:16px"></div>';
   b+='<div class="field"><label>WhatsApp Nummer (z.B. 4917612345678)</label><input type="text" id="eWhatsapp" value="'+(e.whatsapp||'')+'"></div>';
   b+='<div class="field"><label>CallMeBot API Key</label><input type="text" id="eApiKey" value="'+(e.whatsappApiKey||'')+'"></div>';
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1" onclick="saveEmpCurrent()">Speichern</button></div>';

@@ -409,6 +409,7 @@ async function registerFCMToken(empId){
   try {
     if ('serviceWorker' in navigator) {
       await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+      await navigator.serviceWorker.ready;
     }
     const messaging = firebase.messaging();
     const VAPID_KEY = 'BNPl1qFPT0NT4D5WPOPUtt4A1L8mkeyGx0D9yDHSyGRsEhKw7NSEQtRCKL9a01JG6DmNMQA2LsDENoN9CLkJ7fs';

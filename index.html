@@ -16,7 +16,7 @@ body{background:#0d0f14;color:#fff;font-family:'Inter',sans-serif;font-size:14px
 .start-company{font-size:28px;font-weight:700;color:#fff;text-align:center;line-height:1.2;min-height:36px;}
 .start-sub{color:#c0c6dc;font-size:13px;text-align:center;}
 .tile-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%;max-width:520px;margin-top:8px;}
-.tile{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:36px 24px;cursor:pointer;transition:border-color .2s,transform .15s;display:flex;flex-direction:column;align-items:center;gap:14px;user-select:none;}
+.tile{-webkit-appearance:none;appearance:none;text-align:left;width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:36px 24px;cursor:pointer;transition:border-color .2s,transform .15s;display:flex;flex-direction:column;align-items:center;gap:14px;user-select:none;}
 .tile:hover{border-color:var(--accent);transform:translateY(-2px);}
 .tile-icon{font-size:38px;line-height:1;}
 .tile-label{font-size:16px;font-weight:600;}
@@ -106,21 +106,21 @@ tr:hover td{background:rgba(255,255,255,.02);}
   <div class="start-company" id="startCompanyName">TaxiHub</div>
   <p class="start-sub">Bitte Bereich auswaehlen</p>
   <div class="tile-grid">
-    <div class="tile" onclick="openLogin('zentrale')">
+    <button class="tile" onclick="openLogin('zentrale')">
       <div class="tile-icon">&#127970;</div>
       <div class="tile-label">Zentrale</div>
       <div class="tile-desc">Auftrage anlegen, Fahrer zuweisen, Kalender</div>
-    </div>
-    <div class="tile" onclick="openLogin('fahrer')">
+    </button>
+    <button class="tile" onclick="openLogin('fahrer')">
       <div class="tile-icon">&#128661;</div>
       <div class="tile-label">Fahrer</div>
       <div class="tile-desc">Auftrage sehen, annehmen &amp; abschliessen</div>
-    </div>
-    <div class="tile tile-admin" onclick="openLogin('admin')">
+    </button>
+    <button class="tile tile-admin" onclick="openLogin('admin')">
       <div class="tile-icon">&#9881;</div>
       <div class="tile-label">Admin-Konsole</div>
       <div class="tile-desc">Mitarbeiter &amp; Firmendaten verwalten</div>
-    </div>
+    </button>
   </div>
 </div>
 <div class="overlay" id="loginOverlay" style="display:none">
@@ -1704,17 +1704,17 @@ async function init(){
     <div class="start-company" id="startCompanyName">TaxiHub</div>
     <p class="start-sub">Bitte Bereich auswaehlen</p>
     <div class="tile-grid">
-      <div class="tile" onclick="openLogin('zentrale')">
+      <button class="tile" onclick="openLogin('zentrale')">
         <div class="tile-icon">&#127970;</div>
         <div class="tile-label">Zentrale</div>
         <div class="tile-desc">Auftrage anlegen, Fahrer zuweisen, Kalender</div>
       </div>
-      <div class="tile" onclick="openLogin('fahrer')">
+      <button class="tile" onclick="openLogin('fahrer')">
         <div class="tile-icon">&#128661;</div>
         <div class="tile-label">Fahrer</div>
         <div class="tile-desc">Auftrage sehen, annehmen &amp; abschliessen</div>
       </div>
-      <div class="tile tile-admin" onclick="openLogin('admin')">
+      <button class="tile tile-admin" onclick="openLogin('admin')">
         <div class="tile-icon">&#9881;</div>
         <div class="tile-label">Admin-Konsole</div>
         <div class="tile-desc">Mitarbeiter &amp; Firmendaten verwalten</div>

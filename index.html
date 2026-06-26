@@ -922,13 +922,18 @@ function doAssign(rideId){
 function deleteRide(rideId){
   var db=getDB(); var r=db.rides.find(function(x){return x.id===rideId;}); if(!r) return;
   window._delRideId=rideId;
-  var b='<div style="background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:14px;margin-bottom:14px;font-size:13px"><strong>'+r.customerName+' | '+fmtDate(r.date)+' '+r.time+' Uhr</strong></div>';
-  b+='<input type="text" id="delRidePass" style="display:none">';
-  b+='<button class="btn btn-ghost btn-full" style="margin-bottom:8px" onclick="openPinPad(this.dataset.t,this.dataset.l,doDeleteRide)" data-t="delRidePass" data-l="PIN bestaetigen">PIN eingeben</button>';  
-  b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" style="flex:1" onclick="closeGModal()">Abbrechen</button>';
-  b+='<button class="btn btn-danger" style="flex:1" onclick="doDeleteRide()">Loeschen</button></div>';
+  var b='<div style="background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:14px;margin-bottom:14px"><strong>'+r.customerName+' | '+fmtDate(r.date)+' '+r.time+' Uhr</strong></div>';
+  b+='<button class="btn btn-danger btn-full" style="margin-bottom:8px" onclick="confirmDeleteRide()">Mit PIN bestaetigen und Loeschen</button>';
+  b+='<button class="btn btn-ghost btn-full" onclick="closeGModal()">Abbrechen</button>';
   openGModal('Fahrt loeschen?','',b);
-  setTimeout(function(){var el=document.getElementById('delRidePass');if(el)el.focus();},100);
+}
+function confirmDeleteRide(){
+  openPinPad('_dummy','Zentrale-PIN eingeben',function(pin){
+    loadPasswords();
+    if(pin!==PASS_ZENTRALE){ alert('Falsches Passwort!'); return; }
+    var db=getDB(); db.rides=db.rides.filter(function(r){return r.id!==window._delRideId;}); saveDB(db); closeGModal();
+    if(zActiveTab===0) renderZToday(); else if(zActiveTab===1) renderZKalender(); else renderZHistorie();
+  });
 }
 function doDeleteRide(){
   loadPasswords();
@@ -1635,15 +1640,17 @@ function saveEmp(id){
 function confirmDelEmpBtn(btn){
   window._delEmpId=btn.dataset.id; var name=btn.dataset.name;
   var b='<div style="background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:14px;margin-bottom:14px"><strong>'+name+'</strong> wird geloescht.</div>';
-  b+='<input type="text" id="delEmpPass" style="display:none">';
-  b+='<button class="btn btn-ghost btn-full" style="margin-bottom:8px" onclick="openPinPad(this.dataset.t,this.dataset.l,doDelEmp)" data-t="delEmpPass" data-l="Admin-PIN bestaetigen">PIN eingeben</button>'; 
-  b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-danger" style="flex:1" onclick="doDelEmp()">Loeschen</button></div>';
+  b+='<button class="btn btn-danger btn-full" style="margin-bottom:8px" onclick="confirmDelEmp()">Mit Admin-PIN bestaetigen und Loeschen</button>';
+  b+='<button class="btn btn-ghost btn-full" onclick="closeGModal()">Abbrechen</button>';
   openGModal('Mitarbeiter loeschen?','',b);
 }
-function doDelEmp(){
-  loadPasswords(); var pass=(document.getElementById('delEmpPass').value||'');
-  if(pass!==PASS_ADMIN){ alert('Falsches Admin-Passwort.'); return; }
-  var db=getDB(); db.employees=db.employees.filter(function(e){return e.id!==window._delEmpId;}); saveDB(db); closeGModal(); renderAdminEmp();
+function confirmDelEmp(){
+  openPinPad('_dummy','Admin-PIN eingeben',function(pin){
+    loadPasswords();
+    if(pin!==PASS_ADMIN){ alert('Falsches Admin-Passwort!'); return; }
+    var db=getDB(); db.employees=db.employees.filter(function(e){return e.id!==window._delEmpId;}); saveDB(db); closeGModal(); renderAdminEmp();
+  });
+}
 }
 function renderAdminFirma(){
   var db=getDB(); var co=db.company||{};

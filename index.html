@@ -349,13 +349,7 @@ function pinConfirm() {
 }
 
 function openLogin(role){
-  if(!_localCache){
-    // Firebase noch nicht bereit - kurz warten und nochmal versuchen
-    var btn=event&&event.currentTarget;
-    if(btn) btn.style.borderColor='var(--accent)';
-    setTimeout(function(){ openLogin(role); }, 500);
-    return;
-  }
+  if(!_localCache){ _localCache=getDefaultDB(); }
   loginTarget=role;
   loadPasswords();
   document.getElementById('loginError').style.display='none';

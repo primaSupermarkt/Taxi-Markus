@@ -1453,7 +1453,7 @@ function renderFahrer(){
   var gpsColor=_gpsEnabled?'#2ecc71':'#e74c3c';
   var gpsDot='<span style="width:8px;height:8px;border-radius:50%;background:'+gpsColor+';display:inline-block;margin-right:6px;'+(  _gpsEnabled?'box-shadow:0 0 6px #2ecc71':'')+'">'+'</span>';
   var h='<div class="section-header"><div><div class="section-title">Hallo, '+currentUser.name+'</div><div class="section-sub">Deine Fahrten</div></div>';
-  h+='<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;border-color:'+(_gpsEnabled?'rgba(46,204,113,.4)':'rgba(231,76,60,.4)')+'" onclick="toggleGps()">'+gpsDot+(_gpsEnabled?'GPS aktiv':'GPS pausiert')+'</button></div>';
+  h+='<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;position:relative;z-index:10;border-color:'+(_gpsEnabled?'rgba(46,204,113,.4)':'rgba(231,76,60,.4)')+'" onclick="toggleGps()">'+gpsDot+(_gpsEnabled?'GPS aktiv':'GPS pausiert')+'</button></div>';
   h+=renderFahrerBrett();
   if(!allMine.length) h+='<div class="empty-state"><p>Keine Fahrten zugewiesen.</p></div>';
   if(todayR.length){ h+='<div style="font-size:13px;font-weight:600;color:#9aa0b8;margin-bottom:10px;text-transform:uppercase">Heute</div>'; todayR.forEach(function(r){h+=fahrerCard(r);}); }

@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0d0f14">
 <title>TaxiHub</title>
 <style>
@@ -344,8 +344,11 @@ function pinConfirm() {
     var el = document.getElementById(_pinTarget);
     if (el) el.value = _pinValue;
   }
-  if (window._pinConfirmCb) window._pinConfirmCb(_pinValue);
-  closeGModal();
+  if (window._pinConfirmCb) {
+    window._pinConfirmCb(_pinValue);
+  } else {
+    closeGModal();
+  }
 }
 
 function openLogin(role){
@@ -865,7 +868,7 @@ function saveNewRide(){
   if(!first||!last||!from||!date||!time){ alert('Bitte alle Pflichtfelder ausfuellen.'); return; }
   var rideDateTime=new Date(date+'T'+time+':00');
   if(rideDateTime<new Date()){
-    openGModal('Fahrt nicht moeglich','','<div style="background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:10px;padding:20px;text-align:center;margin-bottom:16px"><div style="font-size:28px;margin-bottom:8px">!</div><div style="font-size:15px;font-weight:600;color:#e74c3c;margin-bottom:4px">Zeit liegt in der Vergangenheit</div><div style="font-size:13px;color:#b0b6cc">Fahrtaufnahme nicht moeglich.</div></div><button class="btn btn-ghost btn-full" onclick="closeGModal()">Zurueck</button>');
+    alert('Zeit liegt in der Vergangenheit. Bitte Zeit korrigieren.');
     return;
   }
   var db=getDB();
@@ -1395,7 +1398,7 @@ var _gpsEnabled=false, _gpsWatchId=null, _lastPos=null;
 
 function setupFahrer(){
   document.getElementById('navTabs').innerHTML='';
-  showGpsConsent();
+  setTimeout(function(){ showGpsConsent(); }, 300);
 }
 function showGpsConsent(){
   var b='<div style="text-align:center;padding:8px 0">';

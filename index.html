@@ -137,7 +137,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
     </div>
     <div class="field">
       <label>PIN</label>
-      <input type="text" id="loginPass" placeholder="Tippe auf PIN eingeben" readonly style="cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%;font-family:monospace;font-size:18px;letter-spacing:4px;text-align:center" onclick="openPinPad('loginPass','PIN eingeben',doLogin)">
+      <input type="text" id="loginPass" placeholder="Tippe auf PIN eingeben" readonly autocomplete="off" style="cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%;font-family:monospace;font-size:18px;letter-spacing:4px;text-align:center" onclick="openPinPad('loginPass','PIN eingeben',doLogin)">
     </div>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn-ghost" onclick="closeLogin()">Abbrechen</button>
@@ -167,6 +167,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 <!-- Firebase SDKs (compat version - no ES modules) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <script>
 // ═══════════════════════════════════════
 // FIREBASE CONFIG
@@ -359,7 +360,8 @@ function openLogin(role){
   loginTarget=role;
   loadPasswords();
   document.getElementById('loginError').style.display='none';
-  document.getElementById('loginPass').value='';
+  var lp=document.getElementById('loginPass');
+  if(lp){lp.value='';lp.setAttribute('autocomplete','off');}
   var titles={zentrale:'Zentrale',fahrer:'Fahrer-Login',admin:'Admin-Konsole'};
   document.getElementById('loginTitle').textContent=titles[role];
   document.getElementById('loginSub').textContent='Passwort eingeben';
@@ -398,8 +400,24 @@ function doLogin(){
     if(emp){
       currentRole='fahrer'; currentUser=emp;
       emp.online=true; saveDB(db); closeLogin(); launchApp();
+      registerFCMToken(emp.id);
     } else { err.textContent='Falsches Passwort.'; err.style.display=''; }
   }
+}
+
+async function registerFCMToken(empId){
+  try {
+    const messaging = firebase.messaging();
+    const VAPID_KEY = 'BNPl1qFPT0NT4D5WPOPUtt4A1L8mkeyGx0D9yDHSyGRsEhKw7NSEQtRCKL9a01JG6DmNMQA2LsDENoN9CLkJ7fs';
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){ console.log('Push-Berechtigung verweigert'); return; }
+    const token = await messaging.getToken({ vapidKey: VAPID_KEY });
+    if(token){
+      var db = getDB();
+      var emp = db.employees.find(function(e){ return e.id === empId; });
+      if(emp){ emp.fcmToken = token; saveDB(db); console.log('FCM Token gespeichert:', token); }
+    }
+  } catch(e){ console.log('FCM Fehler:', e.message); }
 }
 
 function logout(){
@@ -1066,15 +1084,10 @@ function customerFormHTML(cu){
   b+='<input type="radio" name="cRecPeriod" value="until"'+(!isOpen?' checked':'')+' style="accent-color:var(--accent);width:16px;height:16px">';
   b+='<div style="flex:1"><div style="font-size:13px;font-weight:600">Bis Datum</div>';
   b+='<div style="font-size:11px;color:#9aa0b8;margin-top:2px">Enddatum festlegen</div></div></label>';
-  var untilVal=co.recurring&&co.recurring.until||'';
-  var untilLabel=untilVal?fmtDate(untilVal):'Datum auswaehlen antippen';
   b+='<div style="margin-top:10px">';
-  b+='<div style="position:relative">';
-  b+='<div style="background:var(--bg3);border:2px solid var(--accent);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;pointer-events:none">';
-  b+='<span style="font-size:15px;font-weight:600;color:'+(untilVal?'#fff':'var(--accent)')+'">'+untilLabel+'</span>';
-  b+='<span style="font-size:18px;color:var(--accent)">&#128197;</span></div>';
-  b+='<input type="date" id="cRecUntil" value="'+untilVal+'" oninput="updateDateLabel(this)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">';
-  b+='</div></div>';
+  b+='<label style="display:block;font-size:12px;color:var(--accent);font-weight:600;margin-bottom:6px">&#8594; Hier Datum antippen zum Festlegen:</label>';
+  b+='<input type="date" id="cRecUntil" value="'+(co.recurring&&co.recurring.until||'')+'" style="background:var(--bg3);border:2px solid var(--accent);border-radius:10px;color:#fff;font-size:15px;padding:14px;width:100%;display:block">';
+  b+='</div>';
   b+='</div></div>';
   b+='</div></div>';
 
@@ -1090,17 +1103,6 @@ function customerFormHTML(cu){
   b+='<div style="font-size:11px;color:#9aa0b8;margin-top:6px">Gilt fuer alle Regelfahrten dieses Kunden</div></div>';
 
   return b;
-}
-
-function updateDateLabel(input){
-  var val=input.value;
-  var overlay=input.previousElementSibling;
-  if(!overlay) return;
-  var span=overlay.querySelector('span');
-  if(span&&val){
-    span.textContent=fmtDate(val);
-    span.style.color='#fff';
-  }
 }
 
 function toggleRecurringForm(){

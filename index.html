@@ -903,7 +903,16 @@ function doAssign(rideId){
   if(!d1){ alert('Bitte mindestens Fahrer 1 auswaehlen.'); return; }
   if(d1===d2){ alert('Fahrer 1 und Backup duerfen nicht identisch sein.'); return; }
   var db=getDB(); var r=db.rides.find(function(x){return x.id===rideId;});
-  if(r){ r.driverId=d1; r.driverId2=d2||null; r.status='pending'; r.tsAccepted=null; r.tsDone=null; saveDB(db); }
+  if(r){
+    r.driverId=d1; r.driverId2=d2||null; r.status='pending'; r.tsAccepted=null; r.tsDone=null; saveDB(db);
+    var e1=db.employees.find(function(e){return e.id===d1;});
+    if(e1&&e1.whatsapp&&e1.whatsappApiKey){
+      var vt={rollstuhl:' (Rollstuhl)',trage:' (Trage)',liege:' (Liege)'};
+      var m='Neue+Fahrt:+'+encodeURIComponent(r.customerName)+'%0ADatum:+'+r.date+'%0AUhrzeit:+'+r.time+'%0AAbholung:+'+encodeURIComponent(r.pickupAddress)+'%0AZiel:+'+encodeURIComponent(r.destination||'-')+(r.vehicleType&&vt[r.vehicleType]?'%0A'+encodeURIComponent(vt[r.vehicleType]):'');
+      fetch('https://api.callmebot.com/whatsapp.php?phone='+e1.whatsapp+'&text='+m+'&apikey='+e1.whatsappApiKey).catch(function(){});
+    }
+    if(d2){var e2=db.employees.find(function(e){return e.id===d2;});if(e2&&e2.whatsapp&&e2.whatsappApiKey){var m2='BACKUP+Fahrt:+'+encodeURIComponent(r.customerName)+'%0A'+r.date+'+um+'+r.time+'+Uhr';fetch('https://api.callmebot.com/whatsapp.php?phone='+e2.whatsapp+'&text='+m2+'&apikey='+e2.whatsappApiKey).catch(function(){});}}
+  }
   closeGModal(); if(zActiveTab===0) renderZToday(); else renderZKalender();
 }
 
@@ -1592,6 +1601,8 @@ function openNewEmp(){
   var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="eFirst" placeholder="Max"></div><div class="field"><label>Nachname</label><input type="text" id="eLast" placeholder="Mustermann"></div></div>';
   b+='<div class="field"><label>Benutzername</label><input type="text" id="eUser" placeholder="max.mustermann"></div>';
   b+='<div class="field"><label>PIN fuer Fahrer</label><input type="text" id="ePass" placeholder="PIN tippen" readonly style="cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#fff;width:100%;font-family:monospace;letter-spacing:4px;font-size:16px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="ePass" data-l="Fahrer-PIN setzen"></div>';
+  b+='<div class="field"><label>WhatsApp Nummer (z.B. 4917612345678)</label><input type="text" id="eWhatsapp" placeholder="4917612345678"></div>';$
+  b+='<div class="field"><label>CallMeBot API Key</label><input type="text" id="eApiKey" placeholder="API Key"></div>';
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1" onclick="saveEmp(null)">Anlegen</button></div>';
   openGModal('Neuer Mitarbeiter','',b);
 }
@@ -1602,16 +1613,20 @@ function openEditEmp(id){ window._editEmpId=id;
   var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="eFirst" value="'+parts[0]+'"></div><div class="field"><label>Nachname</label><input type="text" id="eLast" value="'+parts.slice(1).join(' ')+'"></div></div>';
   b+='<div class="field"><label>Benutzername</label><input type="text" id="eUser" value="'+e.username+'"></div>';
   b+='<div class="field"><label>Neuer PIN (leer lassen = unveraendert)</label><input type="text" id="ePass" placeholder="PIN tippen" readonly style="cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#fff;width:100%;font-family:monospace;letter-spacing:4px;font-size:16px" onclick="openPinPad(this.dataset.t,this.dataset.l,null)" data-t="ePass" data-l="Neuer Fahrer-PIN"></div>';
+  b+='<div class="field"><label>WhatsApp Nummer (z.B. 4917612345678)</label><input type="text" id="eWhatsapp" value="'+(e.whatsapp||'')+'"></div>';$
+  b+='<div class="field"><label>CallMeBot API Key</label><input type="text" id="eApiKey" value="'+(e.whatsappApiKey||'')+'"></div>';
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-primary" style="flex:1" onclick="saveEmpCurrent()">Speichern</button></div>';
   openGModal('Mitarbeiter bearbeiten',e.name,b);
 }
 function saveEmp(id){
   var first=(document.getElementById('eFirst').value||'').trim(); var last=(document.getElementById('eLast').value||'').trim();
   var user=(document.getElementById('eUser').value||'').trim().toLowerCase(); var pass=document.getElementById('ePass').value;
+  var wa=document.getElementById('eWhatsapp')?document.getElementById('eWhatsapp').value.trim():'';
+  var ak=document.getElementById('eApiKey')?document.getElementById('eApiKey').value.trim():'';
   if(!first||!last||!user){ alert('Alle Felder ausser Passwort sind Pflicht.'); return; }
   var db=getDB();
-  if(id){ var e=db.employees.find(function(x){return x.id===id;}); if(e){e.name=first+' '+last;e.username=user;if(pass)e.password=pass;} }
-  else{ if(!pass){ alert('Passwort vergeben.'); return; } db.employees.push({id:uid(),name:first+' '+last,username:user,password:pass,active:true,online:false,gps:null}); }
+  if(id){ var e=db.employees.find(function(x){return x.id===id;}); if(e){e.name=first+' '+last;e.username=user;if(pass)e.password=pass;e.whatsapp=wa;e.whatsappApiKey=ak;} }
+  else{ if(!pass){ alert('Passwort vergeben.'); return; } db.employees.push({id:uid(),name:first+' '+last,username:user,password:pass,active:true,online:false,gps:null,whatsapp:wa,whatsappApiKey:ak}); }
   saveDB(db); closeGModal(); renderAdminEmp();
 }
 function confirmDelEmpBtn(btn){

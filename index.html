@@ -908,9 +908,9 @@ function doAssign(rideId){
     if(e1&&e1.whatsapp&&e1.whatsappApiKey){
       var vt={rollstuhl:' (Rollstuhl)',trage:' (Trage)',liege:' (Liege)'};
       var m='Neue+Fahrt:+'+encodeURIComponent(r.customerName)+'%0ADatum:+'+r.date+'%0AUhrzeit:+'+r.time+'%0AAbholung:+'+encodeURIComponent(r.pickupAddress)+'%0AZiel:+'+encodeURIComponent(r.destination||'-')+(r.vehicleType&&vt[r.vehicleType]?'%0A'+encodeURIComponent(vt[r.vehicleType]):'');
-      fetch('https://api.callmebot.com/whatsapp.php?phone='+e1.whatsapp+'&text='+m+'&apikey='+e1.whatsappApiKey).catch(function(){});
+      new Image().src='https://api.callmebot.com/whatsapp.php?phone='+e1.whatsapp+'&text='+m+'&apikey='+e1.whatsappApiKey;
     }
-    if(d2){var e2=db.employees.find(function(e){return e.id===d2;});if(e2&&e2.whatsapp&&e2.whatsappApiKey){var m2='BACKUP+Fahrt:+'+encodeURIComponent(r.customerName)+'%0A'+r.date+'+um+'+r.time+'+Uhr';fetch('https://api.callmebot.com/whatsapp.php?phone='+e2.whatsapp+'&text='+m2+'&apikey='+e2.whatsappApiKey).catch(function(){});}}
+    if(d2){var e2=db.employees.find(function(e){return e.id===d2;});if(e2&&e2.whatsapp&&e2.whatsappApiKey){var m2='BACKUP+Fahrt:+'+encodeURIComponent(r.customerName)+'%0A'+r.date+'+um+'+r.time+'+Uhr';new Image().src='https://api.callmebot.com/whatsapp.php?phone='+e2.whatsapp+'&text='+m2+'&apikey='+e2.whatsappApiKey;}}
   }
   closeGModal(); if(zActiveTab===0) renderZToday(); else renderZKalender();
 }

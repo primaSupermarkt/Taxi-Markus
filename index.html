@@ -1403,7 +1403,10 @@ function showGpsConsent(){
   b+='<button class="btn btn-primary btn-full" onclick="fahrerGpsStart(true)">Verstanden</button></div>';
   openGModal('Hinweis','',b);
 }
-function fahrerGpsStart(enabled){ closeGModal(); _gpsEnabled=enabled; if(enabled) startGpsTracking(); startFahrerApp(); }
+function fahrerGpsStart(enabled){ closeGModal(); _gpsEnabled=enabled; if(enabled) startGpsTracking();
+  // Frische Daten laden bevor Fahrer-App startet
+  _isSaving=false;
+  DATA_REF().get().then(function(snap){ if(snap.exists){ _localCache=snap.data(); ensureDefaults(); } startFahrerApp(); }).catch(function(){ startFahrerApp(); }); }
 function startFahrerApp(){
   renderFahrer();
   if(window._fahrerRefresh) clearInterval(window._fahrerRefresh);

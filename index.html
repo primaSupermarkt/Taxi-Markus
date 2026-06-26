@@ -193,6 +193,7 @@ const DATA_REF = () => db.collection('taxiapp').doc('data');
 let _localCache = null;
 let _saveTimeout = null;
 let _unsubscribe = null;
+let _isSaving = false;
 
 async function initDB() {
   try {
@@ -209,6 +210,7 @@ async function initDB() {
       if (snap.exists) {
         const newData = snap.data();
         // Nur aktualisieren wenn Aenderung von anderem Geraet kam
+        if (_isSaving) return;
         _localCache = newData;
         ensureDefaults();
         if (currentRole === 'zentrale') {
@@ -260,7 +262,9 @@ function saveDB(data) {
   if (_saveTimeout) clearTimeout(_saveTimeout);
   _saveTimeout = setTimeout(async () => {
     try {
+      _isSaving = true;
       await DATA_REF().set(_localCache);
+      setTimeout(function(){ _isSaving = false; }, 2000);
     } catch(e) {
       console.error('Firebase save error:', e);
     }
@@ -859,7 +863,7 @@ function saveNewRide(){
   var driverId=document.getElementById('nrDriver').value;
   if(!first||!last||!from||!date||!time){ alert('Bitte alle Pflichtfelder ausfuellen.'); return; }
   var rideDateTime=new Date(date+'T'+time+':00');
-  if(rideDateTime<new Date()){
+  if(rideDateTime<new Date(Date.now()-5*60000)){
     alert('Achtung: Zeit liegt in der Vergangenheit. Bitte korrigieren.');
     return;
   }

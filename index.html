@@ -817,8 +817,9 @@ function openNewRide(prefillDate){
   b+='<option value="trage">Trage - Tragestuhl erforderlich</option>';
   b+='<option value="liege">Liege - Liegetransport</option>';
   b+='</select></div>';
+  var _now=new Date(); var _curTime=('0'+_now.getHours()).slice(-2)+':'+('0'+_now.getMinutes()).slice(-2);
   b+='<div class="two-col"><div class="field"><label>Datum</label><input type="date" id="nrDate" value="'+(prefillDate||todayStr())+'"></div>';
-  b+='<div class="field"><label>Uhrzeit</label><input type="time" id="nrTime" value="12:00"></div></div>';
+  b+='<div class="field"><label>Uhrzeit</label><input type="time" id="nrTime" value="'+_curTime+'"></div></div>';
   b+='<div class="field"><label>Fahrer direkt zuweisen (optional)</label><select id="nrDriver">'+driverOpts+'</select></div>';
   b+='<div class="field"><label>Erinnerung - Fahrt einplanen (optional)</label>';
   b+='<select id="nrReminder" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%">';
@@ -1399,12 +1400,11 @@ function setupFahrer(){
 }
 function showGpsConsent(){
   var b='<div style="text-align:center;padding:8px 0">';
-  b+='<div style="font-size:40px;margin-bottom:12px">GPS</div>';
-  b+='<div style="font-size:16px;font-weight:700;margin-bottom:8px">Standort-Freigabe</div>';
-  b+='<div style="font-size:13px;color:#b0b6cc;margin-bottom:20px;line-height:1.6">Diese App uebertraegt deinen Standort an die Zentrale solange du eingeloggt bist.<br>Der Standort wird <strong style="color:#fff">nicht dauerhaft gespeichert</strong>.<br><br>Du kannst GPS jederzeit ein- und ausschalten.</div>';
-  b+='<div style="display:flex;gap:8px;flex-direction:column"><button class="btn btn-primary btn-full" onclick="fahrerGpsStart(true)">GPS aktivieren</button>';
-  b+='<button class="btn btn-ghost btn-full" onclick="fahrerGpsStart(false)">Ohne GPS fortfahren</button></div></div>';
-  openGModal('Standort-Freigabe','',b);
+  b+='<div style="font-size:40px;margin-bottom:12px">📍</div>';
+  b+='<div style="font-size:16px;font-weight:700;margin-bottom:8px">GPS wird aktiviert</div>';
+  b+='<div style="font-size:13px;color:#b0b6cc;margin-bottom:20px;line-height:1.6">Dein Standort wird an die Zentrale uebertragen.<br>Er wird <strong style="color:#fff">nicht dauerhaft gespeichert</strong>.<br><br>Du kannst GPS oben rechts jederzeit abstellen.</div>';
+  b+='<button class="btn btn-primary btn-full" onclick="fahrerGpsStart(true)">Verstanden</button></div>';
+  openGModal('Hinweis','',b);
 }
 function fahrerGpsStart(enabled){ closeGModal(); _gpsEnabled=enabled; if(enabled) startGpsTracking(); startFahrerApp(); }
 function startFahrerApp(){

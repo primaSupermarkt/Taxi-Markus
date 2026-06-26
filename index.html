@@ -259,12 +259,12 @@ function getDB() {
 function saveDB(data) {
   _localCache = data;
   // Debounce: speichert 500ms nach letzter Aenderung
+  _isSaving = true;
   if (_saveTimeout) clearTimeout(_saveTimeout);
   _saveTimeout = setTimeout(async () => {
     try {
-      _isSaving = true;
       await DATA_REF().set(_localCache);
-      setTimeout(function(){ _isSaving = false; }, 2000);
+      setTimeout(function(){ _isSaving = false; }, 1000);
     } catch(e) {
       console.error('Firebase save error:', e);
     }

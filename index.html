@@ -1625,7 +1625,6 @@ function saveEmp(id){
 function confirmDelEmpBtn(btn){
   window._delEmpId=btn.dataset.id; var name=btn.dataset.name;
   var b='<div style="background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:14px;margin-bottom:14px"><strong>'+name+'</strong> wird geloescht.</div>';
-  b+='<input type="text" id="delEmpPass" style="display:none">';
   b+='<div class="field"><label>Admin-PIN</label><input type="password" inputmode="numeric" id="delEmpPass" placeholder="PIN eingeben" style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#fff;width:100%;font-size:16px"></div>'; 
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button><button class="btn btn-danger" style="flex:1" onclick="doDelEmp()">Loeschen</button></div>';
   openGModal('Mitarbeiter loeschen?','',b);

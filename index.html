@@ -413,9 +413,17 @@ async function registerFCMToken(empId){
     if(permission !== 'granted'){ console.log('Push-Berechtigung verweigert'); return; }
     const token = await messaging.getToken({ vapidKey: VAPID_KEY });
     if(token){
-      var db = getDB();
-      var emp = db.employees.find(function(e){ return e.id === empId; });
-      if(emp){ emp.fcmToken = token; saveDB(db); console.log('FCM Token gespeichert:', token); }
+      console.log('FCM Token:', token);
+      // Direkt in Firestore speichern - umgeht Cache-Problem
+      const snap = await DATA_REF().get();
+      const data = snap.data();
+      const empList = data.employees || [];
+      const idx = empList.findIndex(function(e){ return e.id === empId; });
+      if(idx !== -1){
+        empList[idx].fcmToken = token;
+        await DATA_REF().update({ employees: empList });
+        console.log('FCM Token in Firestore gespeichert!');
+      }
     }
   } catch(e){ console.log('FCM Fehler:', e.message); }
 }

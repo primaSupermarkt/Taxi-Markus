@@ -849,10 +849,11 @@ function acLookup(){
   if(!matches.length) return;
   var match=matches[0];
   var fromEl=document.getElementById('nrFrom'); if(fromEl&&!fromEl._manuallyEdited) fromEl.value=match.pickupAddress;
-  // Also set vehicle type if field exists
+  var fromExtraEl=document.getElementById('nrFromExtra'); if(fromExtraEl&&!fromExtraEl._manuallyEdited) fromExtraEl.value=match.pickupExtra||'';
   var vtEl=document.getElementById('nrVehicleType');
   if(vtEl&&match.vehicleType) vtEl.value=match.vehicleType;
   var toEl=document.getElementById('nrTo'); if(toEl&&!toEl._manuallyEdited&&match.usualDestination) toEl.value=match.usualDestination;
+  var toExtraEl=document.getElementById('nrToExtra'); if(toExtraEl&&!toExtraEl._manuallyEdited) toExtraEl.value=match.destinationExtra||'';
 }
 
 function saveNewRide(){
@@ -1048,7 +1049,9 @@ function customerFormHTML(cu){
   b+='<div class="field"><label>Vorname</label><input type="text" id="cFirst" placeholder="Max" value="'+(co.firstName||'')+'"></div>';
   b+='<div class="field"><label>Nachname</label><input type="text" id="cLast" placeholder="Mustermann" value="'+(co.lastName||'')+'"></div>';
   b+='<div class="field"><label>Abholadresse</label><input type="text" id="cAddr" placeholder="Musterstrasse 1, 12345 Stadt" value="'+(co.pickupAddress||'')+'"></div>';
+  b+='<div class="field"><label>Zusatzinfo Abholung (optional)</label><input type="text" id="cAddrExtra" placeholder="z.B. 4. Stock, Zimmer 12, Stationsnummer..." value="'+(co.pickupExtra||'')+'"></div>';
   b+='<div class="field"><label>Standard-Zieladresse (optional)</label><input type="text" id="cDest" placeholder="z. B. Dialysezentrum" value="'+(co.usualDestination||'')+'"></div>';
+  b+='<div class="field"><label>Zusatzinfo Ziel (optional)</label><input type="text" id="cDestExtra" placeholder="z.B. Eingang B, Station 3..." value="'+(co.destinationExtra||'')+'"></div>';
 
   // Befoerderungsart - volle Breite, klare Labels
   b+='<div class="field"><label>Befoerderungsart</label><div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">';
@@ -1164,7 +1167,9 @@ function saveCustomer(id){
   var first=(document.getElementById('cFirst').value||'').trim();
   var last=(document.getElementById('cLast').value||'').trim();
   var addr=(document.getElementById('cAddr').value||'').trim();
+  var addrExtra=(document.getElementById('cAddrExtra').value||'').trim();
   var dest=(document.getElementById('cDest').value||'').trim();
+  var destExtra=(document.getElementById('cDestExtra').value||'').trim();
   var vtEl=document.querySelector('input[name="cVehicleType"]:checked');
   var vehicleType=vtEl?vtEl.value:'taxi';
   var recurring=getRecurringData();
@@ -1174,13 +1179,13 @@ function saveCustomer(id){
     var cu=db.customers.find(function(x){return x.id===id;});
     if(cu){
       cu.firstName=first; cu.lastName=last; cu.pickupAddress=addr;
-      cu.usualDestination=dest||null; cu.vehicleType=vehicleType; cu.recurring=recurring;
+      cu.pickupExtra=addrExtra||null; cu.usualDestination=dest||null; cu.destinationExtra=destExtra||null; cu.vehicleType=vehicleType; cu.recurring=recurring;
       // Regenerate recurring rides
       removeRecurringRides(db,id);
       if(recurring&&recurring.active) generateRecurringRides(db,cu);
     }
   } else {
-    var newCu={id:uid(),firstName:first,lastName:last,pickupAddress:addr,usualDestination:dest||null,vehicleType:vehicleType,recurring:recurring};
+    var newCu={id:uid(),firstName:first,lastName:last,pickupAddress:addr,pickupExtra:addrExtra||null,usualDestination:dest||null,destinationExtra:destExtra||null,vehicleType:vehicleType,recurring:recurring};
     db.customers.push(newCu);
     if(recurring&&recurring.active) generateRecurringRides(db,newCu);
   }
@@ -1218,7 +1223,9 @@ function generateRecurringRides(db,cu){
           id:uid(),
           customerName:cu.firstName+' '+cu.lastName,
           pickupAddress:cu.pickupAddress,
+          pickupExtra:cu.pickupExtra||null,
           destination:cu.usualDestination||'',
+          destinationExtra:cu.destinationExtra||null,
           vehicleType:cu.vehicleType||'taxi',
           date:ds,
           time:rec.time,

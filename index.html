@@ -485,7 +485,7 @@ function rideCardZ(r,db){
   var vtTextColor={rollstuhl:'#e74c3c',trage:'#f39c12',liege:'#f39c12',taxi:'var(--accent)'};
   var vt=r.vehicleType||'taxi';
   var vtBadge=vt!=='taxi'?' <span style="background:'+vtBadgeColor[vt]+';color:'+vtTextColor[vt]+';border-radius:4px;font-size:10px;font-weight:700;padding:2px 8px;border:1px solid '+vtTextColor[vt].replace(')',', .4)').replace('rgb','rgba')+'">'+vtLabels[vt]+'</span>':'';
-  h+='<div class="card-sub">Von: '+r.pickupAddress+(r.destination?' &rarr; '+r.destination:'')+vtBadge+'</div>';
+  h+='<div class="card-sub">Von: '+r.pickupAddress+(r.pickupExtra?' <span style="color:#9aa0b8;font-size:11px">('+r.pickupExtra+')</span>':'')+(r.destination?' &rarr; '+r.destination+(r.destinationExtra?' <span style="color:#9aa0b8;font-size:11px">('+r.destinationExtra+')</span>':''):'')+vtBadge+'</div>';
   h+='</div><span class="badge '+STATUS_BADGE[r.status]+'">'+STATUS_LABEL[r.status]+'</span></div>';
   h+='<div class="info-grid">';
   h+='<div class="info-item"><label>Datum</label><span>'+fmtDate(r.date)+'</span></div>';
@@ -808,7 +808,9 @@ function openNewRide(prefillDate){
   var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="nrFirst" placeholder="Max" autocomplete="off" oninput="acLookup()"></div>';
   b+='<div class="field"><label>Nachname</label><input type="text" id="nrLast" placeholder="Mustermann" autocomplete="off" oninput="acLookup()"></div></div>';
   b+='<div class="field"><label>Abholadresse</label><input type="text" id="nrFrom" placeholder="Strasse, Ort" oninput="this._manuallyEdited=true"></div>';
+  b+='<div class="field"><label>Zusatzinfo Abholung (optional)</label><input type="text" id="nrFromExtra" placeholder="z.B. 4. Stock, Zimmer 12, Stationsnummer..."></div>';
   b+='<div class="field"><label>Zieladresse (optional)</label><input type="text" id="nrTo" placeholder="Zielstrasse, Ort" oninput="this._manuallyEdited=true"></div>';
+  b+='<div class="field"><label>Zusatzinfo Ziel (optional)</label><input type="text" id="nrToExtra" placeholder="z.B. Eingang B, Station 3..."></div>';
   b+='<div class="field"><label>Befoerderungsart</label><select id="nrVehicleType" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%">';
   b+='<option value="taxi">Taxi (Standard)</option>';
   b+='<option value="rollstuhl">Rollstuhl - Rollstuhlgerecht</option>';
@@ -857,7 +859,9 @@ function saveNewRide(){
   var first=(document.getElementById('nrFirst').value||'').trim();
   var last=(document.getElementById('nrLast').value||'').trim();
   var from=document.getElementById('nrFrom').value.trim();
+  var fromExtra=(document.getElementById('nrFromExtra').value||'').trim();
   var to=document.getElementById('nrTo').value.trim();
+  var toExtra=(document.getElementById('nrToExtra').value||'').trim();
   var date=document.getElementById('nrDate').value;
   var time=document.getElementById('nrTime').value;
   var driverId=document.getElementById('nrDriver').value;
@@ -870,11 +874,25 @@ function saveNewRide(){
   var db=getDB();
   var nrVt=document.getElementById('nrVehicleType'); var vehicleType=nrVt?nrVt.value:'taxi';
   var nrRem=document.getElementById('nrReminder'); var reminderMins=nrRem&&nrRem.value?parseInt(nrRem.value):null;
-  // Calculate reminder timestamp
   var rideTs=new Date(date+'T'+time+':00').getTime();
   var reminderTs=reminderMins?rideTs-(reminderMins*60000):null;
-  db.rides.push({id:uid(),customerName:(first+' '+last).trim(),pickupAddress:from,destination:to,vehicleType:vehicleType,date:date,time:time,status:driverId?'pending':'new',driverId:driverId||null,driverId2:null,createdAt:Date.now(),tsAccepted:null,tsDone:null,declineReason:null,reminderMins:reminderMins,reminderTs:reminderTs,reminderDismissed:false});
-  saveDB(db); closeGModal();
+  var newRide={id:uid(),customerName:(first+' '+last).trim(),pickupAddress:from,pickupExtra:fromExtra,destination:to,destinationExtra:toExtra,vehicleType:vehicleType,date:date,time:time,status:driverId?'pending':'new',driverId:driverId||null,driverId2:null,createdAt:Date.now(),tsAccepted:null,tsDone:null,declineReason:null,reminderMins:reminderMins,reminderTs:reminderTs,reminderDismissed:false};
+  db.rides.push(newRide);
+  saveDB(db);
+  // Telegram-Benachrichtigung wenn Fahrer direkt zugewiesen
+  if(driverId){
+    var botToken=(db.company&&db.company.telegramBotToken)||'';
+    var e1=db.employees.find(function(e){return e.id===driverId;});
+    if(botToken&&e1&&e1.telegramChatId){
+      var vt={rollstuhl:'(Rollstuhl)',trage:'(Trage)',liege:'(Liege)'};
+      var vtTag=vehicleType&&vt[vehicleType]?' '+vt[vehicleType]:'';
+      var extraFrom=fromExtra?'\n📝 '+fromExtra:'';
+      var extraTo=toExtra?'\n📝 '+toExtra:'';
+      var msg='🚕 *Neue Fahrt*\n👤 '+(first+' '+last).trim()+vtTag+'\n📅 '+fmtDate(date)+' um '+time+' Uhr\n📍 *Von:* '+from+extraFrom+'\n🏁 *Ziel:* '+(to||'-')+extraTo;
+      sendTelegram(botToken,e1.telegramChatId,msg);
+    }
+  }
+  closeGModal();
   if(zActiveTab===0) renderZToday(); else if(zActiveTab===1) renderZKalender();
 }
 
@@ -904,12 +922,14 @@ function doAssign(rideId){
   var db=getDB(); var r=db.rides.find(function(x){return x.id===rideId;});
   if(r){
     r.driverId=d1; r.driverId2=d2||null; r.status='pending'; r.tsAccepted=null; r.tsDone=null; saveDB(db);
-    var e1=db.employees.find(function(e){return e.id===d1;});
     var botToken=(db.company&&db.company.telegramBotToken)||'';
+    var e1=db.employees.find(function(e){return e.id===d1;});
     if(botToken&&e1&&e1.telegramChatId){
       var vt={rollstuhl:'(Rollstuhl)',trage:'(Trage)',liege:'(Liege)'};
       var vtTag=r.vehicleType&&vt[r.vehicleType]?' '+vt[r.vehicleType]:'';
-      var msg='🚕 *Neue Fahrt*\n👤 '+r.customerName+vtTag+'\n📅 '+fmtDate(r.date)+' um '+r.time+' Uhr\n📍 *Von:* '+r.pickupAddress+'\n🏁 *Ziel:* '+(r.destination||'-');
+      var extraFrom=r.pickupExtra?'\n📝 '+r.pickupExtra:'';
+      var extraTo=r.destinationExtra?'\n📝 '+r.destinationExtra:'';
+      var msg='🚕 *Neue Fahrt*\n👤 '+r.customerName+vtTag+'\n📅 '+fmtDate(r.date)+' um '+r.time+' Uhr\n📍 *Von:* '+r.pickupAddress+extraFrom+'\n🏁 *Ziel:* '+(r.destination||'-')+extraTo;
       sendTelegram(botToken,e1.telegramChatId,msg);
     }
     if(d2){var e2=db.employees.find(function(e){return e.id===d2;});if(botToken&&e2&&e2.telegramChatId){var msg2='🔔 *BACKUP-Fahrt*\n👤 '+r.customerName+'\n📅 '+fmtDate(r.date)+' um '+r.time+' Uhr\n_(Nur falls Fahrer 1 ablehnt)_';sendTelegram(botToken,e2.telegramChatId,msg2);}}
@@ -1497,6 +1517,12 @@ function fahrerCard(r){
   h+='<div class="card-sub">'+r.pickupAddress+(r.destination?' &gt; '+r.destination:'')+(isBackup?' <span style="background:rgba(243,156,18,.15);color:#f39c12;border-radius:4px;font-size:10px;font-weight:700;padding:1px 5px">BACKUP</span>':'')+'</div>';
   h+='</div><span class="badge '+STATUS_BADGE[r.status]+'">'+STATUS_LABEL[r.status]+'</span></div>';
   h+='<div class="info-grid"><div class="info-item"><label>Datum</label><span>'+fmtDate(r.date)+'</span></div><div class="info-item"><label>Uhrzeit</label><span>'+r.time+' Uhr</span></div></div>';
+  if(r.pickupExtra||r.destinationExtra){
+    h+='<div style="background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.25);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px">';
+    if(r.pickupExtra) h+='<div><span style="color:#9aa0b8;font-size:11px;text-transform:uppercase;letter-spacing:.05em">Abholung: </span><strong>'+r.pickupExtra+'</strong></div>';
+    if(r.destinationExtra) h+='<div style="margin-top:'+(r.pickupExtra?'6px':'0')+'"><span style="color:#9aa0b8;font-size:11px;text-transform:uppercase;letter-spacing:.05em">Ziel: </span><strong>'+r.destinationExtra+'</strong></div>';
+    h+='</div>';
+  }
   // Warnung bei besonderer Befoerderungsart
   var vtWarn={rollstuhl:'Rollstuhlgerecht - Rollstuhl mitnehmen!',trage:'Tragestuhl erforderlich!',liege:'Liegetransport - Trage mitnehmen!'};
   if(r.vehicleType&&vtWarn[r.vehicleType]){
@@ -1689,8 +1715,7 @@ function changePassword(which){
 // ═══════════════════════════════════════
 function sendTelegram(botToken, chatId, text){
   if(!botToken||!chatId) return;
-  var url='https://api.telegram.org/bot'+botToken+'/sendMessage';
-  fetch(url,{
+  fetch('https://api.telegram.org/bot'+botToken+'/sendMessage',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({chat_id:chatId,text:text,parse_mode:'Markdown'})

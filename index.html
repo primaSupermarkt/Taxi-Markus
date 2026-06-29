@@ -500,6 +500,7 @@ function rideCardZ(r,db){
   h+='</div>';
   h+='<div class="btn-row">';
   if(r.status==='new'||r.status==='declined') h+='<button class="btn btn-primary" onclick="openAssign(this.dataset.id)" data-id="'+r.id+'">Fahrer zuweisen</button>';
+  if(r.status==='new') h+='<button class="btn btn-ghost" style="padding:8px 14px" onclick="openEditRide(this.dataset.id)" data-id="'+r.id+'">Bearbeiten</button>';
   if(r.status==='pending') h+='<button class="btn btn-ghost" style="padding:8px 14px" onclick="openAssign(this.dataset.id)" data-id="'+r.id+'">Zuweisung aendern</button>';
   if(r.status==='done') h+='<button class="btn btn-ghost" style="padding:8px 14px" onclick="reopenRide(this.dataset.id)" data-id="'+r.id+'">Erneut zuteilen</button>';
   h+='<button class="btn btn-danger" style="padding:8px 14px" onclick="deleteRide(this.dataset.id)" data-id="'+r.id+'">Loeschen</button>';
@@ -913,6 +914,53 @@ function saveNewRide(){
       saveDB(db);
     }
   }
+  if(zActiveTab===0) renderZToday(); else if(zActiveTab===1) renderZKalender();
+}
+
+function openEditRide(rideId){
+  var db=getDB(); var r=db.rides.find(function(x){return x.id===rideId;}); if(!r) return;
+  var vtOpts=['<option value="taxi"'+(r.vehicleType==='taxi'?' selected':'')+'>Taxi (Standard)</option>',
+    '<option value="rollstuhl"'+(r.vehicleType==='rollstuhl'?' selected':'')+'>Rollstuhl - Rollstuhlgerecht</option>',
+    '<option value="trage"'+(r.vehicleType==='trage'?' selected':'')+'>Trage - Tragestuhl erforderlich</option>',
+    '<option value="liege"'+(r.vehicleType==='liege'?' selected':'')+'>Liege - Liegetransport</option>'].join('');
+  var remOpts=[['','Keine Erinnerung'],['5','5 Minuten vorher'],['10','10 Minuten vorher'],['15','15 Minuten vorher'],['20','20 Minuten vorher'],['25','25 Minuten vorher'],['30','30 Minuten vorher'],['60','1 Stunde vorher'],['120','2 Stunden vorher'],['180','3 Stunden vorher'],['360','6 Stunden vorher'],['720','12 Stunden vorher'],['1440','1 Tag vorher'],['2880','2 Tage vorher']].map(function(o){return '<option value="'+o[0]+'"'+(String(r.reminderMins||'')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('');
+  var b='<div class="two-col"><div class="field"><label>Vorname</label><input type="text" id="erFirst" value="'+(r.customerName.split(' ')[0]||'')+'" autocomplete="off"></div>';
+  b+='<div class="field"><label>Nachname</label><input type="text" id="erLast" value="'+(r.customerName.split(' ').slice(1).join(' ')||'')+'" autocomplete="off"></div></div>';
+  b+='<div class="field"><label>Abholadresse</label><input type="text" id="erFrom" value="'+(r.pickupAddress||'')+'"></div>';
+  b+='<div class="field"><label>Zusatzinfo Abholung (optional)</label><input type="text" id="erFromExtra" value="'+(r.pickupExtra||'')+'"></div>';
+  b+='<div class="field"><label>Zieladresse (optional)</label><input type="text" id="erTo" value="'+(r.destination||'')+'"></div>';
+  b+='<div class="field"><label>Zusatzinfo Ziel (optional)</label><input type="text" id="erToExtra" value="'+(r.destinationExtra||'')+'"></div>';
+  b+='<div class="field"><label>Befoerderungsart</label><select id="erVehicleType" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%">'+vtOpts+'</select></div>';
+  b+='<div class="two-col"><div class="field"><label>Datum</label><input type="date" id="erDate" value="'+r.date+'"></div>';
+  b+='<div class="field"><label>Uhrzeit</label><input type="time" id="erTime" value="'+r.time+'"></div></div>';
+  b+='<div class="field"><label>Erinnerung (optional)</label><select id="erReminder" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%">'+remOpts+'</select></div>';
+  b+='<div style="display:flex;gap:8px;margin-top:4px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button>';
+  b+='<button class="btn btn-primary" style="flex:1" onclick="saveEditRide(this.dataset.id)" data-id="'+rideId+'">Speichern</button></div>';
+  openGModal('Fahrt bearbeiten','',b);
+}
+
+function saveEditRide(rideId){
+  var first=(document.getElementById('erFirst').value||'').trim();
+  var last=(document.getElementById('erLast').value||'').trim();
+  var from=(document.getElementById('erFrom').value||'').trim();
+  var fromExtra=(document.getElementById('erFromExtra').value||'').trim();
+  var to=(document.getElementById('erTo').value||'').trim();
+  var toExtra=(document.getElementById('erToExtra').value||'').trim();
+  var date=document.getElementById('erDate').value;
+  var time=document.getElementById('erTime').value;
+  var vehicleType=document.getElementById('erVehicleType').value;
+  var reminderEl=document.getElementById('erReminder');
+  var reminderMins=reminderEl&&reminderEl.value?parseInt(reminderEl.value):null;
+  if(!first||!last||!from||!date||!time){ alert('Bitte alle Pflichtfelder ausfuellen.'); return; }
+  var db=getDB(); var r=db.rides.find(function(x){return x.id===rideId;}); if(!r) return;
+  r.customerName=(first+' '+last).trim();
+  r.pickupAddress=from; r.pickupExtra=fromExtra||null;
+  r.destination=to; r.destinationExtra=toExtra||null;
+  r.vehicleType=vehicleType; r.date=date; r.time=time;
+  r.reminderMins=reminderMins;
+  r.reminderTs=reminderMins?new Date(date+'T'+time+':00').getTime()-(reminderMins*60000):null;
+  r.reminderDismissed=false;
+  saveDB(db); closeGModal();
   if(zActiveTab===0) renderZToday(); else if(zActiveTab===1) renderZKalender();
 }
 

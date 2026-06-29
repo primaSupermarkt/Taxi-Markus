@@ -396,7 +396,7 @@ function doLogin(){
     var emp=db.employees.find(function(e){ return e.id===empId&&e.password===pass&&e.active; });
     if(emp){
       currentRole='fahrer'; currentUser=emp;
-      emp.online=true; saveDB(db); closeLogin(); launchApp();
+      emp.online=true; emp.lastSeen=Date.now(); saveDB(db); closeLogin(); launchApp();
     } else { err.textContent='Falsches Passwort.'; err.style.display=''; }
   }
 }
@@ -406,9 +406,10 @@ function logout(){
     stopGpsTracking();
     var db=getDB();
     var emp=db.employees.find(function(e){ return e.id===currentUser.id; });
-    if(emp){ emp.online=false; emp.gps=null; saveDB(db); }
+    if(emp){ emp.online=false; emp.gps=null; emp.lastSeen=null; saveDB(db); }
   }
   if(window._fahrerRefresh) clearInterval(window._fahrerRefresh);
+  if(window._heartbeatInterval) clearInterval(window._heartbeatInterval);
   currentRole=null; currentUser=null;
   document.getElementById('appShell').style.display='none';
   document.getElementById('startScreen').style.display='flex';
@@ -824,6 +825,11 @@ function openNewRide(prefillDate){
   b+='<div class="field"><label>Erinnerung - Fahrt einplanen (optional)</label>';
   b+='<select id="nrReminder" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%">';
   b+='<option value="">Keine Erinnerung</option>';
+  b+='<option value="5">5 Minuten vorher</option>';
+  b+='<option value="10">10 Minuten vorher</option>';
+  b+='<option value="15">15 Minuten vorher</option>';
+  b+='<option value="20">20 Minuten vorher</option>';
+  b+='<option value="25">25 Minuten vorher</option>';
   b+='<option value="30">30 Minuten vorher</option>';
   b+='<option value="60">1 Stunde vorher</option>';
   b+='<option value="120">2 Stunden vorher</option>';
@@ -835,6 +841,10 @@ function openNewRide(prefillDate){
   b+='</select></div>';
   b+='<div style="display:flex;gap:8px;margin-top:4px"><button class="btn btn-ghost" onclick="closeGModal()">Abbrechen</button>';
   b+='<button class="btn btn-primary" style="flex:1" onclick="saveNewRide()">Fahrt anlegen</button></div>';
+  b+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">';
+  b+='<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#b0b6cc">';
+  b+='<input type="checkbox" id="nrSaveAsCustomer" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer">';
+  b+='<span>Gleichzeitig als Kunde anlegen <span style="color:#9aa0b8;font-size:11px">(Regelfahrt separat unter Kunden aktivieren)</span></span></label></div>';
   openGModal('Neue Fahrt anlegen','',b);
   window._acCustomers=db.customers;
 }
@@ -891,6 +901,15 @@ function saveNewRide(){
       var extraTo=toExtra?'\n📝 '+toExtra:'';
       var msg='🚕 *Neue Fahrt*\n👤 '+(first+' '+last).trim()+vtTag+'\n📅 '+fmtDate(date)+' um '+time+' Uhr\n📍 *Von:* '+from+extraFrom+'\n🏁 *Ziel:* '+(to||'-')+extraTo;
       sendTelegram(botToken,e1.telegramChatId,msg);
+    }
+  }
+  // Kunde anlegen wenn Checkbox gesetzt
+  var saveAsCu=document.getElementById('nrSaveAsCustomer');
+  if(saveAsCu&&saveAsCu.checked){
+    var alreadyExists=db.customers.find(function(cu){return normalize(cu.firstName)===normalize(first)&&normalize(cu.lastName)===normalize(last);});
+    if(!alreadyExists){
+      db.customers.push({id:uid(),firstName:first,lastName:last,pickupAddress:from,pickupExtra:fromExtra||null,usualDestination:to||null,destinationExtra:toExtra||null,vehicleType:vehicleType,recurring:null});
+      saveDB(db);
     }
   }
   closeGModal();
@@ -1111,7 +1130,7 @@ function customerFormHTML(cu){
   b+='<div class="field" style="margin-top:4px"><label>Erinnerung - Fahrer zuweisen</label>';
   b+='<select id="cReminder" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:#fff;width:100%">';
   b+='<option value="">Keine Erinnerung</option>';
-  [['30','30 Minuten vorher'],['60','1 Stunde vorher'],['120','2 Stunden vorher'],['180','3 Stunden vorher'],['360','6 Stunden vorher'],['720','12 Stunden vorher'],['1440','1 Tag vorher'],['2880','2 Tage vorher']].forEach(function(opt){
+  [['5','5 Minuten vorher'],['10','10 Minuten vorher'],['15','15 Minuten vorher'],['20','20 Minuten vorher'],['25','25 Minuten vorher'],['30','30 Minuten vorher'],['60','1 Stunde vorher'],['120','2 Stunden vorher'],['180','3 Stunden vorher'],['360','6 Stunden vorher'],['720','12 Stunden vorher'],['1440','1 Tag vorher'],['2880','2 Tage vorher']].forEach(function(opt){
     b+='<option value="'+opt[0]+'"'+(remVal===opt[0]?' selected':'')+'>'+opt[1]+'</option>';
   });
   b+='</select>';
@@ -1292,8 +1311,22 @@ async function getOrtName(lat, lng) {
 async function renderZFahrerStandorteAsync() {
   var db = getDB();
   var now = Date.now();
-  var active = db.employees.filter(function(e){ return e.active && e.online; });
-  var inactive = db.employees.filter(function(e){ return e.active && !e.online; });
+  var active = db.employees.filter(function(e){
+    if(!e.active||!e.online) return false;
+    // Kein Heartbeat seit >5 Min = gilt als offline
+    if(e.lastSeen && (now - e.lastSeen) > 5*60000) return false;
+    // Kein lastSeen aber online-Flag gesetzt: nur zeigen wenn GPS frisch (<5 Min)
+    if(!e.lastSeen && e.gps && (now - e.gps.ts) > 5*60000) return false;
+    return true;
+  });
+  var inactive = db.employees.filter(function(e){
+    if(!e.active) return false;
+    if(!e.online) return true;
+    // online aber kein Heartbeat seit >5 Min = auch offline anzeigen
+    if(e.lastSeen && (now - e.lastSeen) > 5*60000) return true;
+    if(!e.lastSeen && e.gps && (now - e.gps.ts) > 5*60000) return true;
+    return false;
+  });
 
   // Load all place names first
   var placeNames = {};
@@ -1440,6 +1473,13 @@ function startFahrerApp(){
   renderFahrer();
   if(window._fahrerRefresh) clearInterval(window._fahrerRefresh);
   window._fahrerRefresh=setInterval(function(){if(currentRole==='fahrer') renderFahrer();},8000);
+  // Heartbeat: alle 2 Minuten lastSeen schreiben solange eingeloggt
+  if(window._heartbeatInterval) clearInterval(window._heartbeatInterval);
+  window._heartbeatInterval=setInterval(function(){
+    if(currentRole!=='fahrer'||!currentUser) return;
+    var db=getDB(); var emp=db.employees.find(function(e){return e.id===currentUser.id;});
+    if(emp){ emp.lastSeen=Date.now(); saveDB(db); }
+  },120000);
 }
 function startGpsTracking(){
   if(!navigator.geolocation){ _gpsEnabled=false; return; }

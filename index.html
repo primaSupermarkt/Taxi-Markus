@@ -261,10 +261,9 @@ function getDB() {
 
 function saveDB(data) {
   _localCache = data;
-  // Debounce: speichert 500ms nach letzter Aenderung
   _isSaving = true;
-  if (_saveTimeout) clearTimeout(_saveTimeout);
-  _saveTimeout = setTimeout(function(){ flushSaveDB(); }, 500);
+  if (_saveTimeout) { clearTimeout(_saveTimeout); _saveTimeout = null; }
+  flushSaveDB();
 }
 
 // Schreibt den aktuellen Stand SOFORT nach Firestore (keine Verzoegerung).
@@ -288,7 +287,14 @@ async function flushSaveDB() {
 }
 
 // Beim Schliessen/Verlassen/Minimieren der App: ausstehende Aenderungen sofort sichern
-window.addEventListener('beforeunload', function(){ flushSaveDB(); });
+window.addEventListener('beforeunload', function(e){
+  flushSaveDB();
+  if (_isSaving) {
+    e.preventDefault();
+    e.returnValue = 'Es wird noch gespeichert. Bitte kurz warten.';
+    return e.returnValue;
+  }
+});
 document.addEventListener('visibilitychange', function(){
   if (document.visibilityState === 'hidden') flushSaveDB();
 });

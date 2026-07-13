@@ -261,15 +261,29 @@ function saveDB(data) {
   // Debounce: speichert 500ms nach letzter Aenderung
   _isSaving = true;
   if (_saveTimeout) clearTimeout(_saveTimeout);
-  _saveTimeout = setTimeout(async () => {
-    try {
-      await DATA_REF().set(_localCache);
-      setTimeout(function(){ _isSaving = false; }, 1000);
-    } catch(e) {
-      console.error('Firebase save error:', e);
-    }
-  }, 500);
+  _saveTimeout = setTimeout(function(){ flushSaveDB(); }, 500);
 }
+
+// Schreibt den aktuellen Stand SOFORT nach Firestore (keine Verzoegerung).
+// Wird sowohl vom Debounce-Timeout als auch beim Verlassen der Seite aufgerufen,
+// damit Aenderungen nicht verloren gehen wenn man das Programm zu schnell verlaesst.
+async function flushSaveDB() {
+  if (_saveTimeout) { clearTimeout(_saveTimeout); _saveTimeout = null; }
+  if (!_localCache) return;
+  try {
+    await DATA_REF().set(_localCache);
+    setTimeout(function(){ _isSaving = false; }, 1000);
+  } catch(e) {
+    console.error('Firebase save error:', e);
+    _isSaving = false;
+  }
+}
+
+// Beim Schliessen/Verlassen/Minimieren der App: ausstehende Aenderungen sofort sichern
+window.addEventListener('beforeunload', function(){ flushSaveDB(); });
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'hidden') flushSaveDB();
+});
 
 // ═══════════════════════════════════════
 // PASSWORT HELPERS

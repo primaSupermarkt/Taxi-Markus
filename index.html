@@ -194,6 +194,7 @@ let _localCache = null;
 let _saveTimeout = null;
 let _unsubscribe = null;
 let _isSaving = false;
+let _dbLoadFailed = false;
 
 async function initDB() {
   try {
@@ -224,7 +225,9 @@ async function initDB() {
     return _localCache;
   } catch(e) {
     console.error('Firebase init error:', e);
+    _dbLoadFailed = true;
     _localCache = getDefaultDB();
+    alert('Keine Verbindung zum Server! Die App zeigt jetzt evtl. leere/veraltete Daten. Bitte NICHTS speichern oder anlegen, sonst gehen echte Daten verloren. Internetverbindung pruefen und Seite neu laden.');
     return _localCache;
   }
 }
@@ -270,6 +273,11 @@ function saveDB(data) {
 async function flushSaveDB() {
   if (_saveTimeout) { clearTimeout(_saveTimeout); _saveTimeout = null; }
   if (!_localCache) return;
+  if (_dbLoadFailed) {
+    console.error('Speichern blockiert: initiales Laden von Firestore ist fehlgeschlagen, lokale Daten sind evtl. unvollstaendig.');
+    _isSaving = false;
+    return;
+  }
   try {
     await DATA_REF().set(_localCache);
     setTimeout(function(){ _isSaving = false; }, 1000);

@@ -454,11 +454,24 @@ function renderTabs(tabs,active,cb){
     html+='<div class="nav-tab'+(i===active?' active':'')+' " onclick="switchTab(parseInt(this.dataset.i))" data-i="'+i+'">'+t+'</div>';
   });
   document.getElementById('navTabs').innerHTML=html;
-  cb(active);
+  safeRenderTab(active);
 }
 function switchTab(i){
   document.querySelectorAll('.nav-tab').forEach(function(t,idx){ t.classList.toggle('active',idx===i); });
-  if(_tabCb) _tabCb(i);
+  safeRenderTab(i);
+}
+function safeRenderTab(i){
+  try{
+    if(_tabCb) _tabCb(i);
+  }catch(e){
+    console.error('Render error:',e);
+    var mc=document.getElementById('mainContent');
+    if(mc){
+      mc.innerHTML='<div class="empty-state"><p style="color:#e74c3c;font-weight:600">Fehler beim Laden dieser Ansicht.</p>'
+        +'<p style="font-size:12px;color:#9aa0b8;margin-top:8px">'+(e&&e.message?e.message:e)+'</p>'
+        +'<button class="btn btn-primary" style="margin-top:14px" onclick="location.reload()">Neu laden</button></div>';
+    }
+  }
 }
 
 function openGModal(title,sub,body){
@@ -525,8 +538,8 @@ function rideCardZ(r,db){
 function renderZToday(){
   var db=getDB(); var today=todayStr();
   var allRides=db.rides.filter(function(r){return r.date===today;});
-  var openRides=allRides.filter(function(r){return r.status!=='done';}).sort(function(a,b){return a.time.localeCompare(b.time);});
-  var doneRides=allRides.filter(function(r){return r.status==='done';}).sort(function(a,b){return a.time.localeCompare(b.time);});
+  var openRides=allRides.filter(function(r){return r.status!=='done';}).sort(function(a,b){return (a.time||'').localeCompare(b.time||'');});
+  var doneRides=allRides.filter(function(r){return r.status==='done';}).sort(function(a,b){return (a.time||'').localeCompare(b.time||'');});
   var h='<div class="section-header"><div><div class="section-title">Heute &middot; '+fmtDate(today)+'</div>';
   h+='<div class="section-sub">'+openRides.length+' offen &middot; '+doneRides.length+' abgeschlossen</div></div>';
   h+='<button class="btn btn-primary" onclick="openNewRide(todayStr())">+ Neue Fahrt</button></div>';
@@ -582,7 +595,7 @@ function renderZKalender(){
   var h='<div class="section-header"><div class="section-title">Fahrtenkalender</div>';
   h+='<button class="btn btn-primary" onclick="openNewRideFromCal()">+ Neue Fahrt</button></div>';
   h+=calendarHTML(zCalSel,byDate,'calSelectZ','calNavZ(-1)','calNavZ(1)');
-  var sel=(byDate[zCalSel]||[]).sort(function(a,b){return a.time.localeCompare(b.time);});
+  var sel=(byDate[zCalSel]||[]).sort(function(a,b){return (a.time||'').localeCompare(b.time||'');});
   h+='<div class="section-header" style="margin-top:4px"><div class="section-title" style="font-size:15px">'+fmtDate(zCalSel)+'</div></div>';
   if(!sel.length) h+='<div class="empty-state" style="padding:20px"><p>Keine Fahrten.</p></div>';
   else sel.forEach(function(r){h+=rideCardZ(r,db);});
@@ -619,7 +632,7 @@ function renderHistZeitraum(){
   if(!zHistApplied){ h+='<div class="empty-state"><p>Zeitraum waehlen und Anzeigen druecken.</p></div>'; return h; }
   var db=getDB();
   var rides=db.rides.filter(function(r){return r.status==='done'&&r.date>=zHistVon&&r.date<=zHistBis;});
-  rides.sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
+  rides.sort(function(a,b){return ((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||''));});
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
   h+='<span style="color:#b0b6cc;font-size:13px"><strong style="color:#fff">'+rides.length+'</strong> Fahrten</span>';
   h+='<button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="exportZeitraumPDF()">PDF</button></div>';
@@ -653,7 +666,7 @@ function hzQuick(mode){
 function exportZeitraumPDF(){
   var db=getDB();
   var rides=db.rides.filter(function(r){return r.status==='done'&&r.date>=zHistVon&&r.date<=zHistBis;});
-  rides.sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
+  rides.sort(function(a,b){return ((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||''));});
   openPDFWindow(getCompanyName(),'Fahrten '+fmtDate(zHistVon)+' - '+fmtDate(zHistBis),rides,db);
 }
 
@@ -704,7 +717,7 @@ function doHistSuche(){
     if(to&&r.date>to) return false;
     return true;
   });
-  results.sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
+  results.sort(function(a,b){return ((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||''));});
   window._lastSucheResults=results;
   var h='';
   if(!results.length){ h='<div class="empty-state"><p>Keine Fahrten gefunden.</p></div>'; }
@@ -775,7 +788,7 @@ function doHistFahrer(){
     if(to&&r.date>to) return false;
     return true;
   });
-  results.sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
+  results.sort(function(a,b){return ((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||''));});
   window._lastFahrerResults=results;
   var h='';
   if(!results.length){ h='<div class="empty-state"><p>Keine Fahrten gefunden.</p></div>'; }
@@ -1575,8 +1588,8 @@ function renderFahrer(){
   var emp=db.employees.find(function(e){return e.id===myId;}); if(emp) currentUser=emp;
   var allMine=db.rides.filter(function(r){return (r.driverId===myId||r.driverId2===myId)&&r.status!=='done';});
   var today=todayStr();
-  var todayR=allMine.filter(function(r){return r.date===today;}).sort(function(a,b){return a.time.localeCompare(b.time);});
-  var futureR=allMine.filter(function(r){return r.date>today;}).sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
+  var todayR=allMine.filter(function(r){return r.date===today;}).sort(function(a,b){return (a.time||'').localeCompare(b.time||'');});
+  var futureR=allMine.filter(function(r){return r.date>today;}).sort(function(a,b){return ((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||''));});
   var gpsColor=_gpsEnabled?'#2ecc71':'#e74c3c';
   var gpsDot='<span style="width:8px;height:8px;border-radius:50%;background:'+gpsColor+';display:inline-block;margin-right:6px;'+(  _gpsEnabled?'box-shadow:0 0 6px #2ecc71':'')+'">'+'</span>';
   var h='<div class="section-header"><div><div class="section-title">Hallo, '+currentUser.name+'</div><div class="section-sub">Deine Fahrten</div></div>';

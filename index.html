@@ -1333,7 +1333,7 @@ function delCustomer(id){
   b+='<div style="display:flex;gap:8px"><button class="btn btn-ghost" style="flex:1" onclick="closeGModal()">Abbrechen</button><button class="btn btn-danger" style="flex:1" onclick="doDelCustomer()">Loeschen</button></div>';
   openGModal('Kunden loeschen?','',b);
 }
-function doDelCustomer(){ var db=getDB(); db.customers=db.customers.filter(function(x){return x.id!==window._delCustomerId;}); saveDB(db); closeGModal(); renderZKunden(); }
+function doDelCustomer(){ var db=getDB(); removeRecurringRides(db,window._delCustomerId); db.customers=db.customers.filter(function(x){return x.id!==window._delCustomerId;}); saveDB(db); closeGModal(); renderZKunden(); }
 
 // FAHRER STANDORTE
 // Reverse Geocoding Cache
@@ -1703,7 +1703,37 @@ function startCountdown(rideId,startedAt){
 }
 
 // ADMIN
-function setupAdmin(){ renderTabs(['Mitarbeiter','Firmendaten','Passwoerter'],0,function(i){if(i===0) renderAdminEmp(); else if(i===1) renderAdminFirma(); else renderAdminPasswords();}); }
+function setupAdmin(){ renderTabs(['Mitarbeiter','Firmendaten','Passwoerter','Wartung'],0,function(i){if(i===0) renderAdminEmp(); else if(i===1) renderAdminFirma(); else if(i===2) renderAdminPasswords(); else renderAdminWartung();}); }
+function renderAdminWartung(){
+  var db=getDB();
+  var custIds={}; db.customers.forEach(function(cu){custIds[cu.id]=true;});
+  var orphans=db.rides.filter(function(r){return r.recurringCustomerId&&!custIds[r.recurringCustomerId];});
+  var byCust={};
+  orphans.forEach(function(r){ (byCust[r.recurringCustomerId]=byCust[r.recurringCustomerId]||[]).push(r); });
+  var h='<div class="section-header"><div><div class="section-title">Wartung</div><div class="section-sub">Verwaiste Dauerauftraege bereinigen</div></div></div>';
+  h+='<div class="card">';
+  if(orphans.length===0){
+    h+='<div class="empty-state">Keine verwaisten Dauerauftraege gefunden.</div>';
+  } else {
+    h+='<div style="margin-bottom:14px;font-size:13px;color:var(--text2)">Diese Termine gehoeren zu einem Dauerauftrag, dessen Kunde geloescht wurde. Sie tauchen nicht mehr unter "Kunden" auf und lassen sich dort nicht mehr verwalten.</div>';
+    Object.keys(byCust).forEach(function(cid){
+      var rides=byCust[cid];
+      var name=(rides[0].customerName||rides[0].firstName+' '+rides[0].lastName||'Unbekannter Kunde');
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">';
+      h+='<div><div style="font-weight:600">'+name+'</div><div style="font-size:12px;color:var(--text2)">'+rides.length+' verwaiste Termine (Kunde geloescht)</div></div>';
+      h+='<button class="btn btn-danger" onclick="cleanupOrphanRides(\''+cid+'\')">Bereinigen</button>';
+      h+='</div>';
+    });
+  }
+  h+='</div>';
+  document.getElementById('content').innerHTML=h;
+}
+function cleanupOrphanRides(customerId){
+  var db=getDB();
+  db.rides=db.rides.filter(function(r){return r.recurringCustomerId!==customerId;});
+  saveDB(db);
+  renderAdminWartung();
+}
 function renderAdminEmp(){
   var db=getDB();
   var h='<div class="section-header"><div><div class="section-title">Mitarbeiterverwaltung</div><div class="section-sub">'+db.employees.length+' Fahrer</div></div><button class="btn btn-primary" onclick="openNewEmp()">+ Mitarbeiter</button></div>';
